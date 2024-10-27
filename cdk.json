@@ -1,5 +1,5 @@
 {
-  "app": "node bin/parking_serverless.js",
+  "app": "node cdk/main.js",
   "watch": {
     "include": [
       "**"
