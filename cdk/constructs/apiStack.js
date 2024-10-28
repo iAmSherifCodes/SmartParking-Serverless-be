@@ -39,10 +39,6 @@ class ApiStack extends Stack{
         })
     }
 
-    viewAvailableSpots(props, api){
-
-    }
-
 
 }
 
