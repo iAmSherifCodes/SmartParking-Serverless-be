@@ -1,6 +1,5 @@
 const {CfnOutput, Stack} = require("aws-cdk-lib");
 const {Runtime, Function, Code} = require("aws-cdk-lib/aws-lambda");
-const {TableV2} =require("aws-cdk-lib/aws-dynamodb");
 const {RestApi, LambdaIntegration} = require('aws-cdk-lib/aws-apigateway');
 
 class ApiStack extends Stack{
@@ -16,9 +15,8 @@ class ApiStack extends Stack{
             }
         });
 
-        const parkingSpaceTable = TableV2.fromTableName(this,
-                                                'ParkingSpaceTable',
-                                                'ParkingSpaceTable');
+        const parkingSpaceTable = props.parkingSpaceTable;
+        const reservationTable = props.reservationTable;
 
         const viewAvailableSpots = new Function(this, "ViewAvailableSpots", {
             runtime: Runtime.NODEJS_20_X,
