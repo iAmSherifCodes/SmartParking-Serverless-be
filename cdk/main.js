@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const cdk = require('aws-cdk-lib')
 const { ApiStack } = require('./constructs/apiStack')
+const DatabaseStack = require("./constructs/databaseStack");
 // const { CognitoStack } = require('./constructs/cognitoStack')
 
 const app =new cdk.App();
@@ -11,8 +12,14 @@ if (!stageName) {
     stageName = 'dev'
 }
 
+const dbStack = new DatabaseStack(app, `DB-stack-${stageName}`, {
+
+})
+
 new ApiStack(app, `api-stack-${stageName}`,
     {
-        stageName: stageName
+        stageName: stageName,
+        reservationTable: dbStack.reservationTable,
+        parkingSpaceTable: dbStack.parkingSpaceTable
     })
 // new CognitoStack(app, `cognito-stack-${stageName}`)
