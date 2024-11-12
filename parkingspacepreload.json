@@ -1,0 +1,137 @@
+{
+  "ParkingSpaceTable": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-5"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A4"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-6"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A5"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-7"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A6"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-8"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A7"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-9"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A8"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-10"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A9"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-11"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "B0"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-12"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "B1"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-13"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "B2"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-14"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "B3"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-15"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "B4"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    }
+  ]
+}
+
