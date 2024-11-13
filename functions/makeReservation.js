@@ -8,7 +8,7 @@ const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const getSpaceBySpaceNumber = require("../repositories/getSpaceBySpaceNumber");
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
-const parkingSpaceTable = process.env.PARKING_SPACE_NAME;
+const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
 const reservationTable = process.env.RESERVATION_TABLE;
 const uuid = require("uuid");
 
@@ -137,5 +137,5 @@ const saveReservation = async (spaceNumber, reserveTime, startTime) => {
 
 module.exports.handler = async (event, context) => {
   console.log("CONTEXGT OBJ: ", context);
-  //extract user details from the context object
-};
+  await reserveParkingSpace(event);
+  };
