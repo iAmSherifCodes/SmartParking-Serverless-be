@@ -9,7 +9,6 @@ class ApiStack extends Stack{
 
 
         const restApi = new RestApi(this, `${props.stageName}-MyApi`, {
-            restApiName: 'RestApi',
             deployOptions: {
                 stageName: props.stageName
             }
@@ -29,10 +28,27 @@ class ApiStack extends Stack{
 
         parkingSpaceTable.grantReadData(viewAvailableSpots);
 
-        const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(viewAvailableSpots);
-        restApi.root.addResource("available-spaces").addMethod("GET",viewAvailableSpotsLambdaIntegration);
+        const makeReservation = new Function(this, "MakeReservation",{
+            runtime: Runtime.NODEJS_20_X,
+            handler: "makeReservation.handler",
+            code: Code.fromAsset("functions"),
+            environment: {
+                PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
+                RESERVATION_TABLE: reservationTable.tableName
+            }
+        })
 
-        new CfnOutput(this, 'AvailableSpaceUrl', {
+        parkingSpaceTable.grantReadWriteData(makeReservation);
+        reservationTable.grantReadWriteData(makeReservation);
+
+        const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(viewAvailableSpots);
+        const makeReservationLambdaIntegration = new LambdaIntegration(makeReservation);
+
+        // const rootApi = restApi.root.addResource('v2');
+        restApi.root.addResource("available-spaces").addMethod("GET",viewAvailableSpotsLambdaIntegration);
+        restApi.root.addResource('reserve').addMethod("POST", makeReservationLambdaIntegration)
+
+        new CfnOutput(this, 'url', {
             value: restApi.url
         })
     }
