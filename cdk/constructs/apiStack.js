@@ -1,4 +1,4 @@
-const {CfnOutput, Stack} = require("aws-cdk-lib");
+const {CfnOutput, Stack, Duration} = require("aws-cdk-lib");
 const {Runtime, Function, Code} = require("aws-cdk-lib/aws-lambda");
 const {RestApi, LambdaIntegration} = require('aws-cdk-lib/aws-apigateway');
 
@@ -21,6 +21,7 @@ class ApiStack extends Stack{
             runtime: Runtime.NODEJS_20_X,
             handler: "viewAvailableSpots.handler",
             code: Code.fromAsset("functions"),
+            timeout: Duration.seconds(30),
             environment: {
                 TABLE_NAME: parkingSpaceTable.tableName
             }
@@ -31,6 +32,7 @@ class ApiStack extends Stack{
         const makeReservation = new Function(this, "MakeReservation",{
             runtime: Runtime.NODEJS_20_X,
             handler: "makeReservation.handler",
+            timeout: Duration.seconds(30),
             code: Code.fromAsset("functions"),
             environment: {
                 PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
