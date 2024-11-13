@@ -143,7 +143,17 @@ module.exports.handler = async (event, context) => {
       };
     }
 
- 
+    const spaceAvailability = await getSpaceBySpaceNumber(
+      spaceNumber,
+      parkingSpaceTable
+    );
+
+    if (spaceAvailability.status !== "available") {
+      return {
+        statusCode: 404,
+        body: "Parking space is already reserved",
+      };
+    }
 
     // write the space number to its table (parking space table) as reserved
     // await updateReserveTable(spaceNumber);
