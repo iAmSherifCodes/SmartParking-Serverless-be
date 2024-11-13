@@ -2,7 +2,6 @@ const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, ScanCommand } = require("@aws-sdk/lib-dynamodb");
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
-
 const tableName = process.env.TABLE_NAME;
 
 const getAvailableSpaces = async (limit, lastEvaluatedKey) => {
