@@ -84,7 +84,10 @@ module.exports.handler = async (event, context) => {
     const { reserveTime, spaceNumber } = event.body;
 
     const parsedReservedTime = new Date(reserveTime);
-    const currentDate = new Date();
+    const currentDate = new Date().toLocaleString('en-US', {
+      timeZone: 'Africa/Lagos',
+      hour12: false,
+    });
 
     if (parsedReservedTime < currentDate) {
       return {
