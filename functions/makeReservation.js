@@ -23,12 +23,12 @@ const generateId = () => {
 };
 
 const saveReservation = async (spaceNumber, reserveTime) => {
-  try {
     const v4 = generateId();
     const params = {
       TableName: reservationTable,
+
       Item: {
-        reservation_id: v4,
+        id: v4,
         space_no: spaceNumber,
         // user_id: event.userId,
         reserve_time: reserveTime,
@@ -38,63 +38,31 @@ const saveReservation = async (spaceNumber, reserveTime) => {
     };
     const putCommand = new PutCommand(params);
     const res = await dynamodb.send(putCommand);
-    console.log("SAVED DATA", res);
-    // return ({
-    //   data: res
-    // })
-  } catch (error) {
-    console.log(error);
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        message: "Invalid request body",
-        error: error.message || error,
-      }),
-    };
-  }
-};
+    return {id: v4, spaceNumber, reserveTime}
 
-const reserveParkingSpace = async (spaceNumber, reserveTime) => {
-  try {
-    // Check if the parking space is available in parking space table
-  } catch (error) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        message: "Invalid request body",
-        error: error.message || error,
-      }),
-    };
-  }
 };
 
 const updateReserveTable = async (spaceNumber) => {
-  try {
-    const params = {
-      TableName: parkingSpaceTable,
-      Key: {
-        space_no: spaceNumber,
-      },
-      UpdateExpression: "SET is_reserved = :reserved, status = :available",
-      ExpressionAttributeValues: {
-        ":reserved": true,
-        ":available": "reserved",
-      },
-      ReturnValues: "ALL_NEW",
-    };
+  const params = {
+    TableName: parkingSpaceTable,
+    Key: {
+      space_no: spaceNumber,
+    },
+    UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
+    ExpressionAttributeNames: {
+      "#status": "status",
+      "#is_reserved": "reserved",
+    },
+    ExpressionAttributeValues: {
+      ":reserved": true,
+      ":status": "reserved",
+    },
+    ReturnValues: "ALL_NEW",
+  };
 
-    const updateCommand = new UpdateCommand(params);
-    const res = await dynamodb.send(updateCommand);
-  } catch (error) {
-    console.log(error);
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        message: "Invalid request body",
-        error: error.message || error,
-      }),
-    };
-  }
+  const updateCommand = new UpdateCommand(params);
+  const res = await dynamodb.send(updateCommand);
+  return res;
 };
 
 const getSpaceBySpaceNumber = async (spaceNumber, tableName) => {
@@ -106,7 +74,6 @@ const getSpaceBySpaceNumber = async (spaceNumber, tableName) => {
     ConsistentRead: true,
     ReturnConsumedCapacity: "NONE",
   });
-  console.log("Space availability::: ", space);
   const result = await dynamodb.send(space);
   return result?.Item;
 };
@@ -115,9 +82,6 @@ module.exports.handler = async (event, context) => {
   console.log("CONTEXGT OBJ: ", context);
   try {
     const { reserveTime, spaceNumber } = event.body;
-
-    // const reserveTime = value.reserveTime;
-    // const spaceNumber = value.spaceNumber;
 
     const parsedReservedTime = new Date(reserveTime);
     const currentDate = new Date();
@@ -156,12 +120,14 @@ module.exports.handler = async (event, context) => {
     }
 
     // write the space number to its table (parking space table) as reserved
-    // await updateReserveTable(spaceNumber);
+    await updateReserveTable(spaceNumber);
+    // write to reservation table (user details, reserve time)
+    const res = await saveReservation(spaceNumber, reserveTime);
     return {
       statusCode: 200,
       body: JSON.stringify({
         message: "Parking space reserved successfully",
-        data: spaceAvailability,
+        data: res,
       }),
     };
   } catch (error) {
@@ -173,22 +139,4 @@ module.exports.handler = async (event, context) => {
       }),
     };
   }
-
-  // write to reservation table (user details, reserve time)
-  // await saveReservation(spaceNumber, reserveTime);
-  // return reservationId, spaceNumber, userId with successfull message sent to their email
-  // return {
-  //   statusCode: 200,
-  //   body: JSON.stringify({
-  //     message: "Parking space reserved successfully",
-  //     data: value,
-  //   }),
-  // };
-  // return({
-  //   statusCode: 200,
-  //   body: JSON.stringify({
-  //     message: "Parking space reserved successfully",
-  //     data: data.body.message,
-  //   }),
-  // })
 };
