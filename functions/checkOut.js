@@ -1,6 +1,6 @@
 const {
   DynamoDBDocumentClient,
-  GetCommand,
+  ScanCommand,
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
@@ -31,14 +31,15 @@ module.exports.handler = async (event, context) => {
 };
 
 const getReservationBySpaceNumber = async (spaceNumber) => {
-  const space = new GetCommand({
-    TableName: tableName,
-    Key: {
-      space_no: spaceNumber,
-    },
-    ConsistentRead: true,
-    ReturnConsumedCapacity: "NONE",
-  });
-  const result = await dynamodb.send(space);
-  return result?.Item;
+    const params = {
+        TableName: tableName,
+        FilterExpression: "space_no = :space_no",
+        ExpressionAttributeValues: {
+          ":space_no": spaceNumber
+        }
+      };
+    
+      const command = new ScanCommand(params);
+      const result = await dynamodb.send(command);
+      return result.Items[0];
 };
