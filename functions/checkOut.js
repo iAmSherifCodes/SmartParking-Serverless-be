@@ -4,7 +4,6 @@ const {
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
-// const getSpaceBySpaceNumber = require("../repositories/getSpaceBySpaceNumber");
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 
@@ -43,7 +42,7 @@ const getReservationBySpaceNumber = async (spaceNumber) => {
         const result = await dynamodb.send(command);
         
         if (!result.Items || result.Items.length === 0) {
-            return null; // or throw new Error('No reservation found for space number: ' + spaceNumber)
+            return null;
         }
         
         return result.Items[0];
