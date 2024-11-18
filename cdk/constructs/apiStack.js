@@ -1,6 +1,7 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
 const { RestApi, LambdaIntegration } = require("aws-cdk-lib/aws-apigateway");
+const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
 
 class ApiStack extends Stack {
   constructor(scope, id, props) {
@@ -41,13 +42,12 @@ class ApiStack extends Stack {
     parkingSpaceTable.grantReadWriteData(makeReservation);
     reservationTable.grantReadWriteData(makeReservation);
 
-    const checkOutFunction = new Function(this, "CheckOut", {
+    const checkOutFunction = new NodejsFunction(this, "CheckOut", {
       runtime: Runtime.NODEJS_20_X,
-      handler: "checkOut.handler",
-      timeout: Duration.seconds(30),
-      code: Code.fromAsset("functions"),
+      handler: "handler",
+      entry: 'functions/checkOut.js',
       environment: {
-        RESERVATION_TABLE: reservationTable.tableName,
+        RESERVATION_TABLE: reservationTable.tableName
       },
     });
     reservationTable.grantReadWriteData(checkOutFunction);
