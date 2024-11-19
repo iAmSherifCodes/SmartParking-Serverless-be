@@ -10,7 +10,7 @@ const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
 const reservationTable = process.env.RESERVATION_TABLE;
-const crypto = require("crypto");
+// const crypto = require("crypto");
 
 // const generateId = () => {
 //   const length = 7;
