@@ -20,6 +20,7 @@ new ApiStack(app, `api-stack-${stageName}`,
     {
         stageName: stageName,
         reservationTable: dbStack.reservationTable,
-        parkingSpaceTable: dbStack.parkingSpaceTable
+        parkingSpaceTable: dbStack.parkingSpaceTable,
+        paymentHistoryTable: dbStack.paymentHistoryTable
     })
 // new CognitoStack(app, `cognito-stack-${stageName}`)
