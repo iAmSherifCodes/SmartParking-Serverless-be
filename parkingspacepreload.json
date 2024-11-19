@@ -3,10 +3,46 @@
     {
       "PutRequest": {
         "Item": {
+          "id": {"S": "spaceid-6"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A5"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-6"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A5"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
           "id": {"S": "spaceid-5"},
           "is_reserved": {"BOOL": false},
           "lot_id": {"S": "LAgege-lot-1"},
           "space_no": {"S": "A4"},
+          "status": {"S": "available"},
+          "type": {"S": "regular"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {"S": "spaceid-6"},
+          "is_reserved": {"BOOL": false},
+          "lot_id": {"S": "LAgege-lot-1"},
+          "space_no": {"S": "A5"},
           "status": {"S": "available"},
           "type": {"S": "regular"}
         }

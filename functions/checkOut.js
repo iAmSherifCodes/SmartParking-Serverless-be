@@ -5,7 +5,6 @@ const {
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
-// import { PublishCommand } from '@aws-sdk/client-sns';
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 
@@ -17,7 +16,6 @@ let ratePer30 = 500;
 
 module.exports.handler = async (event, context) => {
   try {
-    // Parse the body if it's a string
     const body =
       typeof event.body === "string" ? JSON.parse(event.body) : event.body;
     const { spaceNumber } = body;
@@ -32,14 +30,10 @@ module.exports.handler = async (event, context) => {
     }
 
     const reservation = await getReservationBySpaceNumber(spaceNumber);
-    // GET THE RESERVE TIME, SUBTRACT DATE.NOW FROM RESERVE TIME
-    // GET THE HOUR AND CHARGE PER 30 MINS RATE
-
     if (reservation) {
-      const reserveTime = new Date(reservation.reserve_time);
-      const currentTime = new Date();
+      const reserveTime = new Date(reservation.reserve_time).getHours();
+      const currentTime = new Date().getMinutes();
       const timeDifference = currentTime - reserveTime;
-      // get number of 30 mins
       const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
       let charge = numberOf30Mins * ratePer30;
 
@@ -58,9 +52,7 @@ module.exports.handler = async (event, context) => {
       // const publishCommand = new PublishCommand(publishParams);
 
       if (savedBill) {
-        // Delete the reservation
         await deleteReservation(reservation)
-        // update the space status to available in Parking space table
         await updateSpaceStatus(reservation.space_no, "available", parkingSpaceTable);
 
         return {

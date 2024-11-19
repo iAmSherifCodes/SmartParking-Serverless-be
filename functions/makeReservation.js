@@ -10,30 +10,15 @@ const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
 const reservationTable = process.env.RESERVATION_TABLE;
-// const crypto = require("crypto");
-
-// const generateId = () => {
-//   const length = 7;
-//   return crypto
-//     .randomBytes(length)
-//     .toString("base64")
-//     .replace(/\//g, "_")
-//     .replace(/\+/g, "-")
-//     .slice(0, length);
-// };
 
 const saveReservation = async (spaceNumber, reserveTime, id) => {
-    // const v4 = generateId();
     const params = {
       TableName: reservationTable,
 
       Item: {
         id: id,
         space_no: spaceNumber,
-        // user_id: event.userId,
         reserve_time: reserveTime,
-        // start_time: startTime,
-        // end_time: event.endTime,
       },
     };
     const putCommand = new PutCommand(params);
@@ -122,9 +107,7 @@ module.exports.handler = async (event, context) => {
       };
     }
 
-    // write the space number to its table (parking space table) as reserved
     await updateReserveTable(spaceNumber);
-    // write to reservation table (user details, reserve time)
     const res = await saveReservation(spaceNumber, reserveTime, context.awsRequestId);
     // TODO
     //  - SEND RESERVATION DETAILS TO CUSTOMER USING SNS
