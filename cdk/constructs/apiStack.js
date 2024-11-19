@@ -15,6 +15,7 @@ class ApiStack extends Stack {
 
     const parkingSpaceTable = props.parkingSpaceTable;
     const reservationTable = props.reservationTable;
+    const paymentHistoryTable = props.paymentHistoryTable;
 
     const viewAvailableSpots = new Function(this, "ViewAvailableSpots", {
       runtime: Runtime.NODEJS_20_X,
@@ -47,10 +48,14 @@ class ApiStack extends Stack {
       handler: "handler",
       entry: 'functions/checkOut.js',
       environment: {
-        RESERVATION_TABLE: reservationTable.tableName
+        RESERVATION_TABLE: reservationTable.tableName,
+        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
+        PARKING_SPACE_TABLE: parkingSpaceTable.tableName
       },
     });
     reservationTable.grantReadWriteData(checkOutFunction);
+    paymentHistoryTable.grantReadWriteData(checkOutFunction);
+    parkingSpaceTable.grantWriteData(checkOutFunction);
 
     const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(
       viewAvailableSpots
