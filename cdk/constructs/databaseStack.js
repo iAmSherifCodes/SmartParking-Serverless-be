@@ -16,11 +16,20 @@ class DatabaseStack extends Stack{
                 type: AttributeType.STRING,
             },
             billingMode: BillingMode.PAY_PER_REQUEST
-        })
+        });
+
+        const paymentHistoryTable = new Table(this, "PaymentHistoryTable",{
+            partitionKey: {
+                name: 'id',
+                type: AttributeType.STRING,
+            },
+            billingMode: BillingMode.PAY_PER_REQUEST
+        });
 
 
         this.parkingSpaceTable = parkingSpaceTable;
         this.reservationTable = reservationTable;
+        this.paymentHistoryTable = paymentHistoryTable;
     }
 }
 
