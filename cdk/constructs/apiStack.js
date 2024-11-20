@@ -29,11 +29,10 @@ class ApiStack extends Stack {
 
     parkingSpaceTable.grantReadData(viewAvailableSpots);
 
-    const makeReservation = new Function(this, "MakeReservation", {
+    const makeReservation = new NodejsFunction(this, "MakeReservation", {
       runtime: Runtime.NODEJS_20_X,
-      handler: "makeReservation.handler",
-      timeout: Duration.seconds(30),
-      code: Code.fromAsset("functions"),
+      handler: "handler",
+      entry: 'functions/makeReservation.js',
       environment: {
         PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
         RESERVATION_TABLE: reservationTable.tableName,
