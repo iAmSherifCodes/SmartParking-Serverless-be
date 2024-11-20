@@ -28,13 +28,31 @@ module.exports.handler = async (event, context) => {
         }),
       };
     }
+    // if (!context?.authorizer?.claims?.email) {
+    //   return {
+    //     statusCode: 401,
+    //     body: JSON.stringify({
+    //       message: "Unauthorized",
+    //     }),
+    //   };
+    // }
 
     const reservation = await getReservationBySpaceNumber(spaceNumber);
     if (reservation) {
-      const reserveTime = new Date(reservation.reserve_time).getHours();
-      const currentTime = new Date().getMinutes();
-      const timeDifference = currentTime - reserveTime;
-      const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
+      const checkoutTime = new Date().toLocaleString('en-US', {
+        timeZone: 'Africa/Lagos',
+        hour12: false,
+      });
+
+      const reserve_time = new Date(reservation.reserve_time).toLocaleDateString('en-US', {
+        timeZone: 'Africa/Lagos',
+        hour12: false,
+      });
+      
+      const numberOf30Mins = get30minsFromReservationAndCheckoutTime(
+        reserve_time,
+        checkoutTime
+      );
       let charge = numberOf30Mins * ratePer30;
 
       const {savedBill, id} = await saveBill(reservation, charge, context);
@@ -75,6 +93,14 @@ module.exports.handler = async (event, context) => {
       }),
     };
   }
+};
+
+const get30minsFromReservationAndCheckoutTime = (reserve_time, checkoutTime) => {
+  const reservationTime = new Date(reserve_time);
+  const checkoutTime = new Date(checkoutTime);
+  const timeDifference = checkoutTime - reservationTime;
+  const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
+  return numberOf30Mins;
 };
 const updateSpaceStatus = async (spaceNumber, status, table) => {
   try {
