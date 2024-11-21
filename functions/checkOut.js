@@ -55,7 +55,7 @@ module.exports.handler = async (event, context) => {
       );
       let charge = numberOf30Mins * ratePer30;
 
-      const {savedBill, id} = await saveBill(reservation, charge, context);
+      const {savedBill, id} = await saveBill(reservation, checkoutTime, charge, context);
       // send payment to user
       // const publishParams = {
       //   Message: `Your parking bill is ${charge}`,
@@ -95,10 +95,8 @@ module.exports.handler = async (event, context) => {
   }
 };
 
-const get30minsFromReservationAndCheckoutTime = (reserve_time, checkoutTime) => {
-  const reservationTime = new Date(reserve_time);
-  const checkoutTime = new Date(checkoutTime);
-  const timeDifference = checkoutTime - reservationTime;
+const get30minsFromReservationAndCheckoutTime = (reserveTime, checkoutTime) => {
+  const timeDifference = checkoutTime - reserveTime;
   const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
   return numberOf30Mins;
 };
@@ -135,7 +133,7 @@ const deleteReservation = async (reservation) => {
   }
 
 };
-const saveBill = async (reservation, charge, context) => {
+const saveBill = async (reservation, checkout_time, charge, context) => {
   try {
     const id = context.awsRequestId;
     const savedBill = await dynamodb.send(
@@ -146,7 +144,7 @@ const saveBill = async (reservation, charge, context) => {
           space_no: reservation.space_no,
           reserve_time: reservation.reserve_time,
           charge,
-          checkout_time: currentTime.toISOString(),
+          checkout_time: checkout_time,
           userDetails: reservation.userDetails,
         },
       })
@@ -170,7 +168,9 @@ const getReservationBySpaceNumber = async (spaceNumber) => {
     const command = new ScanCommand(params);
     const result = await dynamodb.send(command);
     if (!result.Items || result.Items.length === 0) {
-      return null;
+      return {
+        message: `No reservation for ${spaceNumber}`
+      };
     }
 
     return result.Items[0];
