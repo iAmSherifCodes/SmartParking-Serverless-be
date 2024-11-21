@@ -5,8 +5,10 @@ const {
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
+const moment = require("moment-timezone");
 
 const tableName = process.env.RESERVATION_TABLE;
 const paymentHistoryTable = process.env.PAYMENT_HISTORY_TABLE;
@@ -16,8 +18,7 @@ let ratePer30 = 500;
 
 module.exports.handler = async (event, context) => {
   try {
-    const body =
-      typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+    const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
     const { spaceNumber } = body;
 
     if (!spaceNumber) {
@@ -28,34 +29,21 @@ module.exports.handler = async (event, context) => {
         }),
       };
     }
-    // if (!context?.authorizer?.claims?.email) {
-    //   return {
-    //     statusCode: 401,
-    //     body: JSON.stringify({
-    //       message: "Unauthorized",
-    //     }),
-    //   };
-    // }
 
     const reservation = await getReservationBySpaceNumber(spaceNumber);
     if (reservation) {
-      const checkoutTime = new Date().toLocaleString('en-US', {
-        timeZone: 'Africa/Lagos',
-        hour12: false,
-      });
-
-      const reserve_time = new Date(reservation.reserve_time).toLocaleDateString('en-US', {
-        timeZone: 'Africa/Lagos',
-        hour12: false,
-      });
-      
+      const checkoutTime = moment().tz("Africa/Lagos");
+      const unmarshall_time = unmarshall({time: reservation.reserve_time});
+      const reserve_time =  moment(unmarshall_time.time).tz("Africa/Lagos");
+    
       const numberOf30Mins = get30minsFromReservationAndCheckoutTime(
         reserve_time,
-        checkoutTime
+        checkoutTime  
       );
+
       let charge = numberOf30Mins * ratePer30;
 
-      const {savedBill, id} = await saveBill(reservation, checkoutTime, charge, context);
+      const {savedBill, id} = await saveBill(reservation.space_no, reserve_time, checkoutTime.format(), charge, context);
       // send payment to user
       // const publishParams = {
       //   Message: `Your parking bill is ${charge}`,
@@ -96,7 +84,7 @@ module.exports.handler = async (event, context) => {
 };
 
 const get30minsFromReservationAndCheckoutTime = (reserveTime, checkoutTime) => {
-  const timeDifference = checkoutTime - reserveTime;
+  const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
   const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
   return numberOf30Mins;
 };
@@ -133,7 +121,7 @@ const deleteReservation = async (reservation) => {
   }
 
 };
-const saveBill = async (reservation, checkout_time, charge, context) => {
+const saveBill = async (space_no, reserve_time, checkout_time, charge, context) => {
   try {
     const id = context.awsRequestId;
     const savedBill = await dynamodb.send(
@@ -141,11 +129,11 @@ const saveBill = async (reservation, checkout_time, charge, context) => {
         TableName: paymentHistoryTable,
         Item: {
           id: id,
-          space_no: reservation.space_no,
-          reserve_time: reservation.reserve_time,
+          space_no,
+          reserve_time: marshall({time: reserve_time}),
           charge,
           checkout_time: checkout_time,
-          userDetails: reservation.userDetails,
+          userDetails: "user@email.com",
         },
       })
     );
