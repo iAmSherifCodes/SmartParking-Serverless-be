@@ -5,6 +5,7 @@ const {
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const moment = require("moment-timezone");
 // const getSpaceBySpaceNumber = require("../repositories/getSpaceBySpaceNumber");
 const dynamodbClient = new DynamoDB();
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
@@ -12,19 +13,18 @@ const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
 const reservationTable = process.env.RESERVATION_TABLE;
 
 const saveReservation = async (spaceNumber, reserveTime, id) => {
-    const params = {
-      TableName: reservationTable,
+  const params = {
+    TableName: reservationTable,
 
-      Item: {
-        id: id,
-        space_no: spaceNumber,
-        reserve_time: reserveTime,
-      },
-    };
-    const putCommand = new PutCommand(params);
-    const res = await dynamodb.send(putCommand);
-    return {id: v4, spaceNumber, reserveTime}
-
+    Item: {
+      id: id,
+      space_no: spaceNumber,
+      reserve_time: reserveTime,
+    },
+  };
+  const putCommand = new PutCommand(params);
+  const res = await dynamodb.send(putCommand);
+  return { id, spaceNumber, reserveTime };
 };
 
 const updateReserveTable = async (spaceNumber) => {
@@ -50,9 +50,9 @@ const updateReserveTable = async (spaceNumber) => {
   return res;
 };
 
-const getSpaceBySpaceNumber = async (spaceNumber, tableName) => {
+const getSpaceBySpaceNumber = async (spaceNumber) => {
   const space = new GetCommand({
-    TableName: tableName,
+    TableName: parkingSpaceTable,
     Key: {
       space_no: spaceNumber,
     },
@@ -64,17 +64,13 @@ const getSpaceBySpaceNumber = async (spaceNumber, tableName) => {
 };
 
 module.exports.handler = async (event, context) => {
-  console.log("CONTEXGT OBJ: ", context);
   try {
     const { reserveTime, spaceNumber } = event.body;
 
-    const parsedReservedTime = new Date(reserveTime);
-    const currentDate = new Date().toLocaleString('en-US', {
-      timeZone: 'Africa/Lagos',
-      hour12: false,
-    });
+    const currentTime = moment().tz("Africa/Lagos");
+    const reservationTime = moment(reserveTime).tz("Africa/Lagos");
 
-    if (parsedReservedTime < currentDate) {
+    if (reservationTime < currentTime){
       return {
         status: 400,
         success: false,
@@ -82,23 +78,7 @@ module.exports.handler = async (event, context) => {
       };
     }
 
-    // Validation: End time must be within 2 days of start time
-    const maxEndTime = new Date();
-    maxEndTime.setDate(maxEndTime.getDate() + 2);
-
-    if (parsedReservedTime > maxEndTime) {
-      return {
-        status: 400,
-        success: false,
-        message:
-          "Check-in time cannot be more than 2 days from the start time.",
-      };
-    }
-
-    const spaceAvailability = await getSpaceBySpaceNumber(
-      spaceNumber,
-      parkingSpaceTable
-    );
+    const spaceAvailability = await getSpaceBySpaceNumber(spaceNumber);
 
     if (spaceAvailability.status !== "available") {
       return {
@@ -108,7 +88,11 @@ module.exports.handler = async (event, context) => {
     }
 
     await updateReserveTable(spaceNumber);
-    const res = await saveReservation(spaceNumber, reserveTime, context.awsRequestId);
+    const res = await saveReservation(
+      spaceNumber,
+      reservationTime.format(),
+      context.awsRequestId.toString()
+    );
     // TODO
     //  - SEND RESERVATION DETAILS TO CUSTOMER USING SNS
     return {
