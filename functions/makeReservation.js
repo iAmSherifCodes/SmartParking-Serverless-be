@@ -65,7 +65,8 @@ const getSpaceBySpaceNumber = async (spaceNumber) => {
 
 module.exports.handler = async (event, context) => {
   try {
-    const { reserveTime, spaceNumber } = event.body;
+    const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+    const { reserveTime, spaceNumber } = body;
 
     const currentTime = moment().tz("Africa/Lagos");
     const reservationTime = moment(reserveTime).tz("Africa/Lagos");
@@ -83,7 +84,7 @@ module.exports.handler = async (event, context) => {
     if (spaceAvailability.status !== "available") {
       return {
         statusCode: 404,
-        body: "Parking space is already reserved",
+        body: `${spaceNumber} is already reserved`,
       };
     }
 
