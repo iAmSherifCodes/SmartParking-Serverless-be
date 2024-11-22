@@ -6,110 +6,110 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const moment = require("moment-timezone");
-// const getSpaceBySpaceNumber = require("../repositories/getSpaceBySpaceNumber");
-const dynamodbClient = new DynamoDB();
-const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
-const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
-const reservationTable = process.env.RESERVATION_TABLE;
 
-const saveReservation = async (spaceNumber, reserveTime, id) => {
-  const params = {
-    TableName: reservationTable,
+const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
+const { PARKING_SPACE_TABLE: parkingSpaceTable, RESERVATION_TABLE: reservationTable } = process.env;
 
-    Item: {
-      id: id,
-      space_no: spaceNumber,
-      reserve_time: reserveTime,
-    },
-  };
-  const putCommand = new PutCommand(params);
-  const res = await dynamodb.send(putCommand);
-  return { id, spaceNumber, reserveTime };
+
+const TIMEZONE = "Africa/Lagos";
+const STATUS = {
+  AVAILABLE: "available",
+  RESERVED: "reserved"
 };
 
-const updateReserveTable = async (spaceNumber) => {
-  const params = {
-    TableName: parkingSpaceTable,
-    Key: {
-      space_no: spaceNumber,
-    },
-    UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
-    ExpressionAttributeNames: {
-      "#status": "status",
-      "#is_reserved": "reserved",
-    },
-    ExpressionAttributeValues: {
-      ":reserved": true,
-      ":status": "reserved",
-    },
-    ReturnValues: "ALL_NEW",
-  };
 
-  const updateCommand = new UpdateCommand(params);
-  const res = await dynamodb.send(updateCommand);
-  return res;
-};
+class ParkingService {
+  static async saveReservation(spaceNumber, reserveTime, id) {
+    const params = {
+      TableName: reservationTable,
+      Item: { id, space_no: spaceNumber, reserve_time: reserveTime }
+    };
 
-const getSpaceBySpaceNumber = async (spaceNumber) => {
-  const space = new GetCommand({
-    TableName: parkingSpaceTable,
-    Key: {
-      space_no: spaceNumber,
-    },
-    ConsistentRead: true,
-    ReturnConsumedCapacity: "NONE",
-  });
-  const result = await dynamodb.send(space);
-  return result?.Item;
+    await dynamodb.send(new PutCommand(params));
+    return { id, spaceNumber, reserveTime };
+  }
+
+  static async updateReserveTable(spaceNumber) {
+    const params = {
+      TableName: parkingSpaceTable,
+      Key: { space_no: spaceNumber },
+      UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
+      ExpressionAttributeNames: {
+        "#status": "status",
+        "#is_reserved": "reserved"
+      },
+      ExpressionAttributeValues: {
+        ":reserved": true,
+        ":status": STATUS.RESERVED
+      },
+      ReturnValues: "ALL_NEW"
+    };
+
+    return dynamodb.send(new UpdateCommand(params));
+  }
+
+  static async getSpaceBySpaceNumber(spaceNumber) {
+    const command = new GetCommand({
+      TableName: parkingSpaceTable,
+      Key: { space_no: spaceNumber },
+      ConsistentRead: true
+    });
+
+    const { Item } = await dynamodb.send(command);
+    return Item;
+  }
+}
+
+const createResponse = (statusCode, body) => ({
+  statusCode,
+  body: JSON.stringify(body)
+});
+
+const validateReservationTime = (reservationTime, currentTime) => {
+  if (reservationTime < currentTime) {
+    throw new Error("Start time cannot be in the past.");
+  }
 };
 
 module.exports.handler = async (event, context) => {
   try {
-    const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
-    const { reserveTime, spaceNumber } = body;
+    
+    const { reserveTime, spaceNumber } = JSON.parse(
+      typeof event.body === "string" ? event.body : JSON.stringify(event.body)
+    );
 
-    const currentTime = moment().tz("Africa/Lagos");
-    const reservationTime = moment(reserveTime).tz("Africa/Lagos");
+    const currentTime = moment().tz(TIMEZONE);
+    const reservationTime = moment(reserveTime).tz(TIMEZONE);
+    validateReservationTime(reservationTime, currentTime);
 
-    if (reservationTime < currentTime){
-      return {
-        status: 400,
+    // Check space availability
+    const space = await ParkingService.getSpaceBySpaceNumber(spaceNumber);
+    if (!space || space.status !== STATUS.AVAILABLE) {
+      return createResponse(404, {
         success: false,
-        message: "Start time cannot be in the past.",
-      };
+        message: `Parking space ${spaceNumber} is not available`
+      });
     }
 
-    const spaceAvailability = await getSpaceBySpaceNumber(spaceNumber);
-
-    if (spaceAvailability.status !== "available") {
-      return {
-        statusCode: 404,
-        body: `${spaceNumber} is already reserved`,
-      };
-    }
-
-    await updateReserveTable(spaceNumber);
-    const res = await saveReservation(
+    await ParkingService.updateReserveTable(spaceNumber);
+    const reservation = await ParkingService.saveReservation(
       spaceNumber,
       reservationTime.format(),
       context.awsRequestId.toString()
     );
-    // TODO
-    //  - SEND RESERVATION DETAILS TO CUSTOMER USING SNS
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: "Parking space reserved successfully",
-        data: res,
-      }),
-    };
+
+    return createResponse(200, {
+      success: true,
+      message: "Parking space reserved successfully",
+      data: reservation
+    });
+
   } catch (error) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        message: "Invalid request body",
-        error: error.message || error,
-      }),
-    };
+    console.error('Reservation error:', error);
+    return createResponse(400, {
+      success: false,
+      message: "Invalid request",
+      error: error.message
+    });
   }
 };
