@@ -3,170 +3,161 @@ const {
   ScanCommand,
   DeleteCommand,
   PutCommand,
+  UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
-const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
-const dynamodbClient = new DynamoDB();
-const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 const moment = require("moment-timezone");
 
-const tableName = process.env.RESERVATION_TABLE;
-const paymentHistoryTable = process.env.PAYMENT_HISTORY_TABLE;
-const parkingSpaceTable = process.env.PARKING_SPACE_TABLE;
+// Constants
+const TIMEZONE = "Africa/Lagos";
+const RATE_PER_30_MINS = 300;
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
-let ratePer30 = 500;
+const {
+  RESERVATION_TABLE: reservationTable,
+  PAYMENT_HISTORY_TABLE: paymentHistoryTable,
+  PARKING_SPACE_TABLE: parkingSpaceTable,
+} = process.env;
 
-module.exports.handler = async (event, context) => {
-  try {
-    const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
-    const { spaceNumber } = body;
+// Initialize DynamoDB client once
+const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
 
-    if (!spaceNumber) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          message: "spaceNumber is required",
-        }),
-      };
-    }
+// Response helper
+const createResponse = (statusCode, body) => ({
+  statusCode,
+  body: JSON.stringify(body),
+});
 
-    const reservation = await getReservationBySpaceNumber(spaceNumber);
-    if (reservation) {
-      const checkoutTime = moment().tz("Africa/Lagos");
-      const unmarshall_time = unmarshall({time: reservation.reserve_time});
-      const reserve_time =  moment(unmarshall_time.time).tz("Africa/Lagos");
-    
-      const numberOf30Mins = get30minsFromReservationAndCheckoutTime(
-        reserve_time,
-        checkoutTime  
-      );
-
-      let charge = numberOf30Mins * ratePer30;
-
-      const {savedBill, id} = await saveBill(reservation.space_no, reserve_time, checkoutTime.format(), charge, context);
-      // send payment to user
-      // const publishParams = {
-      //   Message: `Your parking bill is ${charge}`,
-      //   PhoneNumber: reservation.userDetails.phone,
-      //   MessageAttributes: {
-      //     "AWS.SNS.SMS.SenderID": {
-      //       DataType: "String",
-      //       StringValue: "ParkingApp",
-      //     },
-      //   },
-      // };
-      // const publishCommand = new PublishCommand(publishParams);
-
-      if (savedBill) {
-        await deleteReservation(reservation)
-        await updateSpaceStatus(reservation.space_no, "available", parkingSpaceTable);
-
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            message: "Please Proceed to Payment",
-            reservation,
-            charge,
-            paymentId: id,
-          }),
-        };
-      }
-    }
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: "Internal server error",
-        error: error.message || error,
-      }),
-    };
-  }
-};
-
-const get30minsFromReservationAndCheckoutTime = (reserveTime, checkoutTime) => {
-  const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
-  const numberOf30Mins = Math.floor(timeDifference / (30 * 60 * 1000));
-  return numberOf30Mins;
-};
-const updateSpaceStatus = async (spaceNumber, status, table) => {
-  try {
-    const updateParams = {
-      TableName: table,
-      Key: {
-        space_no: spaceNumber,
-      },
-      UpdateExpression: "set status = :status",
-      ExpressionAttributeValues: {
-        ":status": status,
-      },
-    };
-    await dynamodb.send(new PutCommand(updateParams));
-  } catch (error) {
-    console.error("Error updating space status:", error);
-    throw error;
-  }
-};
-const deleteReservation = async (reservation) => {
-  try{
-      const deleteParams = {
-    TableName: tableName,
-    Key: {
-      id: reservation.id,
-    },
-  };
-  await dynamodb.send(new DeleteCommand(deleteParams));
-  }catch(error){
-    console.error("Error deleting reservation:", error);
-    throw error;
-  }
-
-};
-const saveBill = async (space_no, reserve_time, checkout_time, charge, context) => {
-  try {
-    const id = context.awsRequestId;
-    const savedBill = await dynamodb.send(
-      new PutCommand({
-        TableName: paymentHistoryTable,
-        Item: {
-          id: id,
-          space_no,
-          reserve_time: marshall({time: reserve_time}),
-          charge,
-          checkout_time: checkout_time,
-          userDetails: "user@email.com",
-        },
-      })
-    );
-    return {savedBill, id};
-  } catch (error) {
-    console.error("Error saving bill:", error);
-    throw error;
-  }
-};
-
-const getReservationBySpaceNumber = async (spaceNumber) => {
-  try {
+class ParkingService {
+  static async getReservationBySpaceNumber(spaceNumber) {
     const params = {
-      TableName: tableName,
+      TableName: reservationTable,
       FilterExpression: "space_no = :space_no",
       ExpressionAttributeValues: {
         ":space_no": spaceNumber,
       },
     };
-    const command = new ScanCommand(params);
-    const result = await dynamodb.send(command);
-    if (!result.Items || result.Items.length === 0) {
-      return {
-        message: `No reservation for ${spaceNumber}`
-      };
+
+    const { Items } = await dynamodb.send(new ScanCommand(params));
+    return Items?.[0];
+  }
+
+  static calculateCharge(reserveTime, checkoutTime) {
+    const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
+    const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
+    return numberOf30Mins === 0 ? RATE_PER_30_MINS : numberOf30Mins * RATE_PER_30_MINS;
+  }
+
+  static async saveBill(spaceNo, reserveTime, checkoutTime, charge, id) {
+    const params = {
+      TableName: paymentHistoryTable,
+      Item: {
+        id,
+        space_no: spaceNo,
+        reserve_time: reserveTime,
+        charge,
+        checkout_time: checkoutTime,
+        userDetails: "user@email.com", // Consider making this dynamic
+      },
+    };
+
+    await dynamodb.send(new PutCommand(params));
+    return { id };
+  }
+
+  static async updateSpaceStatus(spaceNumber, isReserved = false) {
+    const params = {
+      TableName: parkingSpaceTable,
+      Key: { space_no: spaceNumber },
+      UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
+      ExpressionAttributeNames: {
+        "#status": "status",
+        "#is_reserved": "reserved",
+      },
+      ExpressionAttributeValues: {
+        ":reserved": isReserved,
+        ":status": isReserved ? "reserved" : "available",
+      },
+    };
+
+    await dynamodb.send(new UpdateCommand(params));
+  }
+
+  static async deleteReservation(reservationId) {
+    const params = {
+      TableName: reservationTable,
+      Key: { id: reservationId },
+    };
+
+    await dynamodb.send(new DeleteCommand(params));
+  }
+
+  static async processCheckout(reservation, checkoutTime, requestId) {
+    const reserveTime = moment(reservation.reserve_time).tz(TIMEZONE);
+    const charge = this.calculateCharge(reserveTime, checkoutTime);
+
+    const { id } = await this.saveBill(
+      reservation.space_no,
+      reserveTime.format(),
+      checkoutTime.format(),
+      charge,
+      requestId
+    );
+
+    await Promise.all([
+      this.deleteReservation(reservation.id),
+      this.updateSpaceStatus(reservation.space_no, false),
+    ]);
+
+    return { charge, paymentId: id };
+  }
+}
+
+module.exports.handler = async (event, context) => {
+  try {
+    const { spaceNumber } = JSON.parse(
+      typeof event.body === "string" ? event.body : JSON.stringify(event.body)
+    );
+
+    if (!spaceNumber) {
+      return createResponse(400, {
+        success: false,
+        message: "spaceNumber is required",
+      });
     }
 
-    return result.Items[0];
-  } catch (error) {
-    console.error(
-      `Error fetching reservation for space ${spaceNumber}:`,
-      error
+    const reservation = await ParkingService.getReservationBySpaceNumber(spaceNumber);
+    
+    if (!reservation) {
+      return createResponse(404, {
+        success: false,
+        message: `No reservation found for space ${spaceNumber}`,
+      });
+    }
+
+    const checkoutTime = moment().tz(TIMEZONE);
+    const { charge, paymentId } = await ParkingService.processCheckout(
+      reservation,
+      checkoutTime,
+      context.awsRequestId.toString()
     );
-    throw error;
+
+    return createResponse(200, {
+      success: true,
+      message: "Please Proceed to Payment",
+      data: {
+        reservation,
+        charge,
+        paymentId,
+      },
+    });
+
+  } catch (error) {
+    console.error("Checkout error:", error);
+    return createResponse(500, {
+      success: false,
+      message: "Internal server error",
+      error: error.message || "Unknown error occurred",
+    });
   }
 };
