@@ -1,6 +1,6 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
-const { RestApi, LambdaIntegration } = require("aws-cdk-lib/aws-apigateway");
+const { RestApi, LambdaIntegration, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
 
 class ApiStack extends Stack {
@@ -64,13 +64,25 @@ class ApiStack extends Stack {
     );
     const checkOutLambdaIntegration = new LambdaIntegration(checkOutFunction);
 
-    // const rootApi = restApi.root.addResource('v2');
+    const cognitoAuthorizer = new CfnAuthorizer(this, 'CognitoAuthorizer', {
+      name: 'CognitoAuthorizer',
+      type: 'COGNITO_USER_POOLS',
+      identitySource: 'method.request.header.Authorization',
+      providerArns: [props.userPool.userPoolArn],
+      restApiId: restApi.restApiId,
+    })
+
     restApi.root
       .addResource("available-spaces")
       .addMethod("GET", viewAvailableSpotsLambdaIntegration);
     restApi.root
       .addResource("reserve")
-      .addMethod("POST", makeReservationLambdaIntegration);
+      .addMethod("POST", makeReservationLambdaIntegration,{
+        authorizationType: AuthorizationType.COGNITO,
+        authorizer: {
+          authorizerId: cognitoAuthorizer.ref
+        },
+      });
     restApi.root
       .addResource("checkout")
       .addMethod("POST", checkOutLambdaIntegration);
