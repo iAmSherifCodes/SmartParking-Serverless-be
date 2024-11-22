@@ -8,7 +8,6 @@ const {
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const moment = require("moment-timezone");
 
-// Constants
 const TIMEZONE = "Africa/Lagos";
 const RATE_PER_30_MINS = 300;
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
@@ -19,10 +18,8 @@ const {
   PARKING_SPACE_TABLE: parkingSpaceTable,
 } = process.env;
 
-// Initialize DynamoDB client once
 const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
 
-// Response helper
 const createResponse = (statusCode, body) => ({
   statusCode,
   body: JSON.stringify(body),
