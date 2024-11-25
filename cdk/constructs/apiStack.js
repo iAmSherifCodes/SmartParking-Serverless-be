@@ -52,9 +52,21 @@ class ApiStack extends Stack {
         PARKING_SPACE_TABLE: parkingSpaceTable.tableName
       },
     });
+
+    const initiatePayment = new NodejsFunction(this, "InitiatePayment", {
+      runtime: Runtime.NODEJS_20_X,
+      handler: "handler",
+      entry: 'functions/initiatePayment.js',
+      environment: {
+        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
+        FLW_SECRET_KEY: "FLWSECK_TEST-d98900bcf1bc84b659a91ce565febe08-X"
+      },
+    });
+
     reservationTable.grantReadWriteData(checkOutFunction);
     paymentHistoryTable.grantReadWriteData(checkOutFunction);
     parkingSpaceTable.grantWriteData(checkOutFunction);
+    paymentHistoryTable.grantReadWriteData(initiatePayment);
 
     const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(
       viewAvailableSpots
@@ -63,26 +75,35 @@ class ApiStack extends Stack {
       makeReservation
     );
     const checkOutLambdaIntegration = new LambdaIntegration(checkOutFunction);
+    const initiatePaymentIntegration = new LambdaIntegration(initiatePayment);
 
-    const cognitoAuthorizer = new CfnAuthorizer(this, 'CognitoAuthorizer', {
-      name: 'CognitoAuthorizer',
-      type: 'COGNITO_USER_POOLS',
-      identitySource: 'method.request.header.Authorization',
-      providerArns: [props.userPool.userPoolArn],
-      restApiId: restApi.restApiId,
-    })
+    // const cognitoAuthorizer = new CfnAuthorizer(this, 'CognitoAuthorizer', {
+    //   name: 'CognitoAuthorizer',
+    //   type: 'COGNITO_USER_POOLS',
+    //   identitySource: 'method.request.header.Authorization',
+    //   providerArns: [props.userPool.userPoolArn],
+    //   restApiId: restApi.restApiId,
+    // })
+
+    // TODO
+    // read up on webuser and user pool
+    // configure makereservation and checkout auth
+    // and test
 
     restApi.root
       .addResource("available-spaces")
       .addMethod("GET", viewAvailableSpotsLambdaIntegration);
-    restApi.root
-      .addResource("reserve")
-      .addMethod("POST", makeReservationLambdaIntegration,{
-        authorizationType: AuthorizationType.COGNITO,
-        authorizer: {
-          authorizerId: cognitoAuthorizer.ref
-        },
-      });
+
+    restApi.root.addResource("reserve").addMethod("POST", makeReservationLambdaIntegration);
+    restApi.root.addResource("pay").addMethod("POST", initiatePaymentIntegration);
+    // restApi.root
+    //   .addResource("reserve")
+    //   .addMethod("POST", makeReservationLambdaIntegration,{
+    //     authorizationType: AuthorizationType.COGNITO,
+    //     authorizer: {
+    //       authorizerId: cognitoAuthorizer.ref
+    //     },
+    //   });
     restApi.root
       .addResource("checkout")
       .addMethod("POST", checkOutLambdaIntegration);
