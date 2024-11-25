@@ -9,7 +9,7 @@ const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const moment = require("moment-timezone");
 
 const TIMEZONE = "Africa/Lagos";
-const RATE_PER_30_MINS = 300;
+const RATE_PER_30_MINS = 305.99;
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 const {
@@ -54,6 +54,7 @@ class ParkingService {
         reserve_time: reserveTime,
         charge,
         checkout_time: checkoutTime,
+        paymentStatus: "unsuccessful",
         userDetails: "user@email.com", // Consider making this dynamic
       },
     };
