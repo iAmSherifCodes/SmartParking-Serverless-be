@@ -1,36 +1,73 @@
-const Flutterwave = require('flutterwave-node-v3');
-const { initiatePaymentSchema } = require("../utils/initiatePaymentSchema");
+const axios = require('axios');
+const {
+    DynamoDBDocumentClient,
+    GetCommand
+  } = require("@aws-sdk/lib-dynamodb");
+  const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
+const { PAYMENT_HISTORY_TABLE: paymentHistoryTable, FLW_SECRET_KEY } = process.env;
 
-const flw = new Flutterwave(process.env.FLW_PUBLIC_KEY, process.env.FLW_SECRET_KEY);
+const fetchPaymentDetails = async (paymentId) => {
+    const params = {
+        TableName: paymentHistoryTable,
+        Key: { id: paymentId },
+    };
+
+    const { Item } = await dynamodb.send(new GetCommand(params));
+    return Item;
+};
+
+// const updatePaymentStatus = async (paymentId, status) => {
+//     const params = {
+//         TableName: paymentHistoryTable,
+//         Key: { id: paymentId },
+//         UpdateExpression: "SET #paymentStatus = :status",
+//         ExpressionAttributeNames: {
+//             "#paymentStatus": "paymentStatus",
+//         },
+//         ExpressionAttributeValues: {
+//             ":status": status,
+//         },
+//     };
+
+//     await dynamodb.send(new UpdateCommand(params));
+// };
 
 module.exports.handler = async (event, context) => {
+
     try {
         const body = parseEventBody(event.body);
-        const { value } = await initiatePaymentSchema.validateAsync(body);
+        const paymentDetails = await fetchPaymentDetails(body.paymentId);
 
         const paymentData = {
             currency: "NGN",
-            amount: value.amount,
+            amount: paymentDetails.charge,
             customer:{
-                email: value.customer.email,
-                phonenumber: value.customer.phone_number,
-                fullname: value.customer.fullname,
+                email: paymentDetails.userDetails,
             },
             customizations: {
-                title: 'Flutterwave Standard Payment'
+                title: 'Smart Parking Payment',
+                description: "Please proceed to checkout"
               },
             tx_ref: context.awsRequestId.toString(),
             redirect_url: "www.google.com",
         };
 
-        const response = await flw.Card.charge_card(paymentData);
+        const response =  await axios.post(
+            'https://api.flutterwave.com/v3/payments', paymentData, {
+                headers: {
+                  Authorization: `Bearer ${FLW_SECRET_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              });
 
-        if (response.status === 'success') {
+        if (response.data.status === 'success') {
             console.log('Card Charge Successful', response.data);
+            // await updatePaymentStatus(body.paymentId, 'successful');
             return createResponse(200, response.data);
         } else {
             console.log('Card Charge Failed', response);
-            throw new Error(response.message);
+            throw new Error(response);
         }
     } catch (error) {
         console.error('Error:', error);
