@@ -85,3 +85,9 @@ function createResponse(statusCode, body) {
         body: JSON.stringify(body)
     };
 }
+
+
+// TODO
+// secure apis
+// SAVE KEYS TO SSM PARAMETER STORE and implement caching
+// 
