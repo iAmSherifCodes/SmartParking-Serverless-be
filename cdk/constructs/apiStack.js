@@ -7,9 +7,23 @@ class ApiStack extends Stack {
   constructor(scope, id, props) {
     super(scope, id, props);
 
+    const origins = ["http://localhost:3001"];
+
     const restApi = new RestApi(this, `${props.stageName}-MyApi`, {
       deployOptions: {
         stageName: props.stageName,
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: origins,
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowHeaders: [
+          'Content-Type',
+          'Authorization',
+          'Accept',
+          'X-Requested-With'
+        ],
+        allowCredentials: true,
+        maxAge: Duration.days(1),
       },
     });
 
