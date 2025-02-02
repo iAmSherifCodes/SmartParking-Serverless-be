@@ -42,29 +42,35 @@ const getAvailableSpaces = async (limit, lastEvaluatedKey) => {
     }
 };
 
+const createResponse = (statusCode, body) => ({
+    statusCode,
+    body: JSON.stringify(body),
+    headers: {
+        'Access-Control-Allow-Origin': 'http://localhost:3001',
+        'Access-Control-Allow-Credentials': true,
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+});
+
+
 module.exports.handler = async (event, context) => {
     try {
-        const { limit, cursor: lastEvaluatedKey} = event.queryStringParameters || {};
+        const { limit, cursor: lastEvaluatedKey } = event.queryStringParameters || {};
 
         if (!limit) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({
-                    message: "Missing required parameter: limit",
-                }),
-            };
+            return createResponse(400, JSON.stringify({
+                message: "Missing required parameter: limit",
+            }));
         }
 
         const availableSpaces = await getAvailableSpaces(limit, lastEvaluatedKey || null);
-        return {
-            statusCode: 200,
-            body: JSON.stringify(availableSpaces),
-        };
+        return createResponse(200, JSON.stringify(availableSpaces));
     } catch (error) {
         console.log("Error:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: "Internal server error", error: error.message || error }),
-        };
+        return createResponse(500, JSON.stringify({
+            message: "Internal server error",
+            error: error.message || error,
+        }));
     }
 };
