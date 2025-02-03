@@ -47,18 +47,20 @@ class ParkingService {
   }
 
 
-static calculateCharge(reserveTime, checkoutTime){
-  const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
-  const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
-  if (numberOf30Mins <= 0) {
-    return RATE_PER_30_MINS;
-  } else {
-    return numberOf30Mins * RATE_PER_30_MINS;
+
+  static calculateCharge(reserveTime, checkoutTime) {
+    const reservationDateTime = new Date(reserveTime);
+    const checkoutDateTime = new Date(checkoutTime);
+    const timeDifference = checkoutDateTime - reservationDateTime;
+    if (timeDifference < 0) {
+      return RATE_PER_30_MINS;
+    } else if (timeDifference < THIRTY_MINUTES_IN_MS) {
+      return RATE_PER_30_MINS;
+    } else {
+      const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
+      return numberOf30Mins === 0 ? RATE_PER_30_MINS : numberOf30Mins * RATE_PER_30_MINS;
+    }
   }
-
-}
-
-
 
   static async saveBill(spaceNo, reserveTime, checkoutTime, charge, id) {
     const params = {
