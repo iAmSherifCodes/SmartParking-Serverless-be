@@ -11,7 +11,7 @@ const moment = require("moment-timezone");
 const TIMEZONE = "Africa/Lagos";
 const RATE_PER_30_MINS = 305.99;
 const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
-const ALLOWED_ORIGINS = ['localhost:3001'];
+const ALLOWED_ORIGINS = ['http://localhost:3002'];
 
 const {
   RESERVATION_TABLE: reservationTable,
@@ -25,9 +25,11 @@ const createResponse = (statusCode, body) => ({
   statusCode,
   body: JSON.stringify(body),
   headers: {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Credentials": true,
-  },
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Credentials': true,
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+  }
 });
 
 class ParkingService {
@@ -45,24 +47,18 @@ class ParkingService {
   }
 
 
-// recalculate calcualteCharge method. if the checkoutTime is less than the reserveTime is should return the base fee
-
-// static calculateCharge(reserveTime, checkoutTime){
-//   const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
-//   const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
-//   if (numberOf30Mins <= 0) {
-//     return RATE_PER_30_MINS;
-//   } else {
-//     return numberOf30Mins * RATE_PER_30_MINS;
-//   }
-
-// }
-
-  static calculateCharge(reserveTime, checkoutTime) {
-    const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
-    const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
-    return numberOf30Mins === 0 ? RATE_PER_30_MINS : numberOf30Mins * RATE_PER_30_MINS;
+static calculateCharge(reserveTime, checkoutTime){
+  const timeDifference = checkoutTime.valueOf() - reserveTime.valueOf();
+  const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
+  if (numberOf30Mins <= 0) {
+    return RATE_PER_30_MINS;
+  } else {
+    return numberOf30Mins * RATE_PER_30_MINS;
   }
+
+}
+
+
 
   static async saveBill(spaceNo, reserveTime, checkoutTime, charge, id) {
     const params = {
