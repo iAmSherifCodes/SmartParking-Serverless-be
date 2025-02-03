@@ -15,7 +15,7 @@ class ApiStack extends Stack {
       },
       defaultCorsPreflightOptions: {
         allowOrigins: origins,
-        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowMethods: ['GET', 'POST', 'OPTIONS'],
         allowHeaders: [
           'Content-Type',
           'Authorization',
@@ -73,7 +73,7 @@ class ApiStack extends Stack {
       entry: 'functions/initiatePayment.js',
       environment: {
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        FLW_SECRET_KEY: "YOUR SECRET KEY"
+        FLW_SECRET_KEY: "YOUR FLUTTERWAVE KEY HERE"
       },
     });
 
