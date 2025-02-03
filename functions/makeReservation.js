@@ -62,7 +62,13 @@ class ParkingService {
 
 const createResponse = (statusCode, body) => ({
   statusCode,
-  body: JSON.stringify(body)
+  body: JSON.stringify(body),
+  headers: {
+    'Access-Control-Allow-Origin': 'http://localhost:3002',
+    'Access-Control-Allow-Credentials': true,
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+  }
 });
 
 const validateReservationTime = (reservationTime, currentTime) => {
