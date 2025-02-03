@@ -15,6 +15,7 @@ class DatabaseStack extends Stack{
                 name: 'id',
                 type: AttributeType.STRING,
             },
+            contributorInsightsEnabled: false,
             billingMode: BillingMode.PAY_PER_REQUEST
         });
 
@@ -23,6 +24,7 @@ class DatabaseStack extends Stack{
                 name: 'id',
                 type: AttributeType.STRING,
             },
+            contributorInsightsEnabled: false,
             billingMode: BillingMode.PAY_PER_REQUEST
         });
 
