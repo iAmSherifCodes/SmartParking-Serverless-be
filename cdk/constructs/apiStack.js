@@ -7,7 +7,7 @@ class ApiStack extends Stack {
   constructor(scope, id, props) {
     super(scope, id, props);
 
-    const origins = ["http://localhost:3001"];
+    const origins = ["http://localhost:3002"];
 
     const restApi = new RestApi(this, `${props.stageName}-MyApi`, {
       deployOptions: {
@@ -73,7 +73,7 @@ class ApiStack extends Stack {
       entry: 'functions/initiatePayment.js',
       environment: {
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        FLW_SECRET_KEY: "FLWSECK_TEST-d98900bcf1bc84b659a91ce565febe08-X"
+        FLW_SECRET_KEY: "YOUR SECRET KEY"
       },
     });
 
@@ -100,7 +100,7 @@ class ApiStack extends Stack {
     // })
 
     // TODO
-    // read up on webuser and user pool
+    // Configure webuser and user pool
     // configure makereservation and checkout auth
     // and test
 
@@ -129,3 +129,7 @@ class ApiStack extends Stack {
 }
 
 module.exports = { ApiStack };
+
+
+// TODO:
+// INTEGRATING AWS SQS FOR MAKE PAYMENT COMMAND
