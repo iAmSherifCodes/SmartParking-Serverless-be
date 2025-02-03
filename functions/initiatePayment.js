@@ -82,7 +82,7 @@ module.exports.handler = async (event, context) => {
                 'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
                 'Access-Control-Allow-Credentials': true,
                 'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+                'Access-Control-Allow-Methods': 'POST,OPTIONS',
                 Location: response.data.data.link
             });
         } else {
@@ -105,7 +105,7 @@ function createResponse(statusCode, body, headers) {
             'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
             'Access-Control-Allow-Credentials': true,
             'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+            'Access-Control-Allow-Methods': 'POST,OPTIONS'
         }
     };
 
