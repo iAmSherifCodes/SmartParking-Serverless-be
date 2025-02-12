@@ -17,6 +17,7 @@ const {
   RESERVATION_TABLE: reservationTable,
   PAYMENT_HISTORY_TABLE: paymentHistoryTable,
   PARKING_SPACE_TABLE: parkingSpaceTable,
+  RESERVATION_HISTORY_TABLE: reservationHistoryTable
 } = process.env;
 
 const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
@@ -28,7 +29,7 @@ const createResponse = (statusCode, body) => ({
     'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Credentials': true,
     'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+    'Access-Control-Allow-Methods': 'POST'
   }
 });
 
@@ -44,6 +45,27 @@ class ParkingService {
 
     const { Items } = await dynamodb.send(new ScanCommand(params));
     return Items?.[0];
+  }
+
+  static async saveReservationHistory(id, paymentId, spaceNumber, checkoutTime, reserve_time, charge, email, paymentStatus) {
+    const params = {
+      TableName: reservationHistoryTable,
+      Item: {
+        id,
+        email,
+        paymentId,
+        space_no: spaceNumber,
+        reserve_time,
+        charge,
+        checkout_time: checkoutTime,
+        paymentStatus,
+        userDetails: email
+      },
+    };
+
+    await dynamodb.send(new PutCommand(params));
+    return { id: reservation.id };
+
   }
 
 
@@ -62,17 +84,17 @@ class ParkingService {
     }
   }
 
-  static async saveBill(spaceNo, reserveTime, checkoutTime, charge, id) {
+  static async saveBill(spaceNumber, reserveTime, checkoutTime, charge, id, email) {
     const params = {
       TableName: paymentHistoryTable,
       Item: {
         id,
-        space_no: spaceNo,
+        email,
+        space_no: spaceNumber,
         reserve_time: reserveTime,
         charge,
         checkout_time: checkoutTime,
         paymentStatus: "unsuccessful",
-        userDetails: "user@email.com", // Consider making this dynamic
       },
     };
 
@@ -107,7 +129,7 @@ class ParkingService {
     await dynamodb.send(new DeleteCommand(params));
   }
 
-  static async processCheckout(reservation, checkoutTime, requestId) {
+  static async processCheckout(reservation, checkoutTime, requestId, email) {
     const reserveTime = moment(reservation.reserve_time).tz(TIMEZONE);
     const charge = this.calculateCharge(reserveTime, checkoutTime);
 
@@ -116,7 +138,8 @@ class ParkingService {
       reserveTime.format(),
       checkoutTime.format(),
       charge,
-      requestId
+      requestId,
+      email
     );
 
     await Promise.all([
@@ -142,7 +165,7 @@ module.exports.handler = async (event, context) => {
     }
 
     const reservation = await ParkingService.getReservationBySpaceNumber(spaceNumber);
-    
+
     if (!reservation) {
       return createResponse(404, {
         success: false,
@@ -151,11 +174,25 @@ module.exports.handler = async (event, context) => {
     }
 
     const checkoutTime = moment().tz(TIMEZONE);
+    const generatedId = context.awsRequestId.toString();
+
     const { charge, paymentId } = await ParkingService.processCheckout(
       reservation,
       checkoutTime,
-      context.awsRequestId.toString()
+      generatedId,
+      reservation.email
     );
+
+    await ParkingService.saveReservationHistory(
+      generatedId,
+      paymentId,
+      spaceNumber,
+      checkoutTime,
+      reservation.reserve_time,
+      charge,
+      reservation.space_no,
+      reservation.email,
+      "Uncompleted")
 
     return createResponse(200, {
       success: true,
