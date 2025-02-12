@@ -13,23 +13,24 @@ class ApiStack extends Stack {
       deployOptions: {
         stageName: props.stageName,
       },
-      defaultCorsPreflightOptions: {
-        allowOrigins: origins,
-        allowMethods: ['GET', 'POST', 'OPTIONS'],
-        allowHeaders: [
-          'Content-Type',
-          'Authorization',
-          'Accept',
-          'X-Requested-With'
-        ],
-        allowCredentials: true,
-        maxAge: Duration.days(1),
-      },
+      // defaultCorsPreflightOptions: {
+      //   allowOrigins: origins,
+      //   allowMethods: ['GET', 'POST', 'OPTIONS'],
+      //   allowHeaders: [
+      //     'Content-Type',
+      //     'Authorization',
+      //     'Accept',
+      //     'X-Requested-With'
+      //   ],
+      //   allowCredentials: true,
+      //   maxAge: Duration.days(1),
+      // },  
     });
 
     const parkingSpaceTable = props.parkingSpaceTable;
     const reservationTable = props.reservationTable;
     const paymentHistoryTable = props.paymentHistoryTable;
+    const reservationHistory = props.reservationHistory;
 
     const viewAvailableSpots = new Function(this, "ViewAvailableSpots", {
       runtime: Runtime.NODEJS_20_X,
@@ -63,7 +64,8 @@ class ApiStack extends Stack {
       environment: {
         RESERVATION_TABLE: reservationTable.tableName,
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        PARKING_SPACE_TABLE: parkingSpaceTable.tableName
+        PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
+        RESERVATION_HISTORY_TABLE: reservationHistory.tableName
       },
     });
 
@@ -73,7 +75,17 @@ class ApiStack extends Stack {
       entry: 'functions/initiatePayment.js',
       environment: {
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        FLW_SECRET_KEY: "YOUR FLUTTERWAVE KEY HERE"
+        FLW_SECRET_KEY: "XXXXXXXXXXXX"
+      },
+    });
+
+    const webhookListener = new NodejsFunction(this, "WebhookListener", {
+      runtime: Runtime.NODEJS_20_X,
+      handler: "handler",
+      entry: 'functions/webhookListener.js',
+      environment: {
+        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
+        RESERVATION_HISTORY_TABLE: reservationHistory.tableName
       },
     });
 
@@ -81,6 +93,8 @@ class ApiStack extends Stack {
     paymentHistoryTable.grantReadWriteData(checkOutFunction);
     parkingSpaceTable.grantWriteData(checkOutFunction);
     paymentHistoryTable.grantReadWriteData(initiatePayment);
+    reservationHistory.grantReadWriteData(webhookListener);
+    paymentHistoryTable.grantReadWriteData(webhookListener);
 
     const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(
       viewAvailableSpots
@@ -90,7 +104,7 @@ class ApiStack extends Stack {
     );
     const checkOutLambdaIntegration = new LambdaIntegration(checkOutFunction);
     const initiatePaymentIntegration = new LambdaIntegration(initiatePayment);
-
+    const webhookListenerIntegration = new LambdaIntegration(webhookListener);
     // const cognitoAuthorizer = new CfnAuthorizer(this, 'CognitoAuthorizer', {
     //   name: 'CognitoAuthorizer',
     //   type: 'COGNITO_USER_POOLS',
@@ -121,6 +135,10 @@ class ApiStack extends Stack {
     restApi.root
       .addResource("checkout")
       .addMethod("POST", checkOutLambdaIntegration);
+
+    restApi.root
+      .addResource("webhook")
+      .addMethod("POST", webhookListenerIntegration);
 
     new CfnOutput(this, "url", {
       value: restApi.url,
