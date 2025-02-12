@@ -49,7 +49,7 @@ module.exports.handler = async (event, context) => {
         const body = parseEventBody(event.body);
         const paymentDetails = await fetchPaymentDetails(body.paymentId);
 
-        if (paymentDetails.paymentStatus === 'successful'){
+        if (paymentDetails.paymentStatus === 'successful') {
             return createResponse(400, { error: 'Payment already successful' });
         }
 
@@ -63,8 +63,9 @@ module.exports.handler = async (event, context) => {
                 title: 'Smart Parking Payment',
                 description: "Please proceed to checkout"
             },
-            tx_ref: context.awsRequestId.toString(),
+            tx_ref: body.paymentId,
             redirect_url: "www.google.com",
+
         };
 
         const response = await axios.post(
@@ -76,15 +77,9 @@ module.exports.handler = async (event, context) => {
         });
 
         if (response.data.status === 'success') {
-            console.log('Card Charge Successful', response.data);
-            await updatePaymentStatus(body.paymentId, 'successful');
-            return createResponse(302, response.data, {
-                'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
-                'Access-Control-Allow-Credentials': true,
-                'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-                'Access-Control-Allow-Methods': 'POST,OPTIONS',
-                Location: response.data.data.link
-            });
+            console.log('Card Charge In Progress', response.data);
+            await updatePaymentStatus(body.paymentId, 'In Progress');
+            return createResponse(200, response.data);
         } else {
             console.log('Card Charge Failed', response);
             throw new Error(response);
@@ -99,21 +94,17 @@ function parseEventBody(body) {
     return typeof body === "string" ? JSON.parse(body) : body;
 }
 
-function createResponse(statusCode, body, headers) {
-    if (!headers) {
-        headers = {
+function createResponse(statusCode, body) {
+    return {
+        statusCode,
+        body: JSON.stringify(body),
+        headers: {
             'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
             'Access-Control-Allow-Credentials': true,
             'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'POST,OPTIONS'
+            'Access-Control-Allow-Methods': 'POST'
         }
     };
-
-return {
-    statusCode,
-    body: JSON.stringify(body),
-    headers
-};
 }
 
 
