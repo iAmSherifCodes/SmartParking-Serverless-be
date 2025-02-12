@@ -19,6 +19,16 @@ class DatabaseStack extends Stack{
             billingMode: BillingMode.PAY_PER_REQUEST
         });
 
+
+        const reservationHistory = new Table(this, "ReservationHistoryTable", {
+            partitionKey: {
+                name: 'id',
+                type: AttributeType.STRING,
+            },
+            contributorInsightsEnabled: false,
+            billingMode: BillingMode.PAY_PER_REQUEST
+        });
+
         const paymentHistoryTable = new Table(this, "PaymentHistoryTable",{
             partitionKey: {
                 name: 'id',
@@ -32,6 +42,7 @@ class DatabaseStack extends Stack{
         this.parkingSpaceTable = parkingSpaceTable;
         this.reservationTable = reservationTable;
         this.paymentHistoryTable = paymentHistoryTable;
+        this.reservationHistory = reservationHistory;
     }
 }
 
