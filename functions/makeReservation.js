@@ -19,14 +19,14 @@ const STATUS = {
 
 
 class ParkingService {
-  static async saveReservation(spaceNumber, reserveTime, id) {
+  static async saveReservation(spaceNumber, reserveTime, id, email) {
     const params = {
       TableName: reservationTable,
-      Item: { id, space_no: spaceNumber, reserve_time: reserveTime }
+      Item: { id, space_no: spaceNumber, reserve_time: reserveTime, userEmail: email }
     };
 
     await dynamodb.send(new PutCommand(params));
-    return { id, spaceNumber, reserveTime };
+    return { id, spaceNumber, reserveTime, email };
   }
 
   static async updateReserveTable(spaceNumber) {
@@ -79,8 +79,8 @@ const validateReservationTime = (reservationTime, currentTime) => {
 
 module.exports.handler = async (event, context) => {
   try {
-    
-    const { reserveTime, spaceNumber } = JSON.parse(
+
+    const { reserveTime, spaceNumber, email } = JSON.parse(
       typeof event.body === "string" ? event.body : JSON.stringify(event.body)
     );
 
@@ -101,7 +101,8 @@ module.exports.handler = async (event, context) => {
     const reservation = await ParkingService.saveReservation(
       spaceNumber,
       reservationTime.format(),
-      context.awsRequestId.toString()
+      context.awsRequestId.toString(),
+      email
     );
 
     return createResponse(200, {
