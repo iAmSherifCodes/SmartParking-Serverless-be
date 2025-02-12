@@ -92,6 +92,7 @@ class ApiStack extends Stack {
     reservationTable.grantReadWriteData(checkOutFunction);
     paymentHistoryTable.grantReadWriteData(checkOutFunction);
     parkingSpaceTable.grantWriteData(checkOutFunction);
+    reservationHistory.grantReadWriteData(checkOutFunction);
     paymentHistoryTable.grantReadWriteData(initiatePayment);
     reservationHistory.grantReadWriteData(webhookListener);
     paymentHistoryTable.grantReadWriteData(webhookListener);
