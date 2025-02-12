@@ -26,6 +26,7 @@ new ApiStack(app, `api-stack-${stageName}`,
         reservationTable: dbStack.reservationTable,
         parkingSpaceTable: dbStack.parkingSpaceTable,
         paymentHistoryTable: dbStack.paymentHistoryTable,
+        reservationHistory: dbStack.reservationHistory
         // webUserPool: cognitoStack.webUserPoolClient,
         // userPool: cognitoStack.userPool
     })
