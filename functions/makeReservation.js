@@ -84,6 +84,13 @@ module.exports.handler = async (event, context) => {
       typeof event.body === "string" ? event.body : JSON.stringify(event.body)
     );
 
+    if(!email){
+      return createResponse(400, {
+        success: false,
+        message: "Email is required"
+      });
+    }
+
     const currentTime = moment().tz(TIMEZONE);
     const reservationTime = moment(reserveTime).tz(TIMEZONE);
     validateReservationTime(reservationTime, currentTime);
