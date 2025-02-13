@@ -7,13 +7,6 @@ const tableName = process.env.TABLE_NAME;
 const getAvailableSpaces = async (limit, lastEvaluatedKey) => {
     const params = {
         TableName: tableName,
-        // FilterExpression: "#status = :status",
-        // ExpressionAttributeNames: {
-        //     "#status": "status",
-        // },
-        // ExpressionAttributeValues: {
-        //     ":status": "available",
-        // },
         Limit: Number(limit),
     };
 
