@@ -57,14 +57,14 @@ module.exports.handler = async (event, context) => {
             currency: "NGN",
             amount: paymentDetails.charge,
             customer: {
-                email: paymentDetails.userDetails,
+                email: paymentDetails.userEmail,
             },
             customizations: {
                 title: 'Smart Parking Payment',
                 description: "Please proceed to checkout"
             },
             tx_ref: body.paymentId,
-            redirect_url: "www.google.com",
+            redirect_url: "http://localhost:3002",
 
         };
 
