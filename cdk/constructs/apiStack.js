@@ -2,6 +2,7 @@ const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
 const { RestApi, LambdaIntegration, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
+// const { EmailIdentity } = require('aws-cdk-lib/aws-ses')
 
 class ApiStack extends Stack {
   constructor(scope, id, props) {
@@ -13,19 +14,23 @@ class ApiStack extends Stack {
       deployOptions: {
         stageName: props.stageName,
       },
-      // defaultCorsPreflightOptions: {
-      //   allowOrigins: origins,
-      //   allowMethods: ['GET', 'POST', 'OPTIONS'],
-      //   allowHeaders: [
-      //     'Content-Type',
-      //     'Authorization',
-      //     'Accept',
-      //     'X-Requested-With'
-      //   ],
-      //   allowCredentials: true,
-      //   maxAge: Duration.days(1),
-      // },  
+      defaultCorsPreflightOptions: {
+        allowOrigins: origins,
+        allowMethods: ['GET', 'POST', 'OPTIONS'],
+        allowHeaders: [
+          'Content-Type',
+          'Authorization',
+          'Accept',
+          'X-Requested-With'
+        ],
+        allowCredentials: true,
+        maxAge: Duration.days(1),
+      },
     });
+
+    // const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
+    //   identity: ses.Identity.email('awofiranyesherif4@gmail.com'),
+    // });
 
     const parkingSpaceTable = props.parkingSpaceTable;
     const reservationTable = props.reservationTable;
@@ -69,6 +74,11 @@ class ApiStack extends Stack {
       },
     });
 
+    reservationTable.grantReadWriteData(checkOutFunction);
+    paymentHistoryTable.grantReadWriteData(checkOutFunction);
+    parkingSpaceTable.grantWriteData(checkOutFunction);
+    reservationHistory.grantReadWriteData(checkOutFunction);
+
     const initiatePayment = new NodejsFunction(this, "InitiatePayment", {
       runtime: Runtime.NODEJS_20_X,
       handler: "handler",
@@ -78,6 +88,8 @@ class ApiStack extends Stack {
         FLW_SECRET_KEY: "XXXXXXXXXXXX"
       },
     });
+
+    paymentHistoryTable.grantReadWriteData(initiatePayment);
 
     const webhookListener = new NodejsFunction(this, "WebhookListener", {
       runtime: Runtime.NODEJS_20_X,
@@ -89,20 +101,10 @@ class ApiStack extends Stack {
       },
     });
 
-    reservationTable.grantReadWriteData(checkOutFunction);
-    paymentHistoryTable.grantReadWriteData(checkOutFunction);
-    parkingSpaceTable.grantWriteData(checkOutFunction);
-    reservationHistory.grantReadWriteData(checkOutFunction);
-    paymentHistoryTable.grantReadWriteData(initiatePayment);
-    reservationHistory.grantReadWriteData(webhookListener);
     paymentHistoryTable.grantReadWriteData(webhookListener);
 
-    const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(
-      viewAvailableSpots
-    );
-    const makeReservationLambdaIntegration = new LambdaIntegration(
-      makeReservation
-    );
+    const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(viewAvailableSpots);
+    const makeReservationLambdaIntegration = new LambdaIntegration(makeReservation);
     const checkOutLambdaIntegration = new LambdaIntegration(checkOutFunction);
     const initiatePaymentIntegration = new LambdaIntegration(initiatePayment);
     const webhookListenerIntegration = new LambdaIntegration(webhookListener);
