@@ -47,24 +47,21 @@ class ParkingService {
     return Items?.[0];
   }
 
-  static async saveReservationHistory(id, paymentId, spaceNumber, checkoutTime, reserve_time, charge, email, paymentStatus) {
+  static async saveReservationHistory(id, paymentId, spaceNumber, checkoutTime, reserve_time, email) {
     const params = {
       TableName: reservationHistoryTable,
       Item: {
         id,
-        email,
         paymentId,
         space_no: spaceNumber,
         reserve_time,
-        charge,
-        checkout_time: checkoutTime,
-        paymentStatus,
-        userDetails: email
+        checkout_time: checkoutTime.format(),
+        userEmail: email
       },
     };
 
     await dynamodb.send(new PutCommand(params));
-    return { id: reservation.id };
+    return { id };
 
   }
 
@@ -89,7 +86,7 @@ class ParkingService {
       TableName: paymentHistoryTable,
       Item: {
         id,
-        email,
+        userEmail: email,
         space_no: spaceNumber,
         reserve_time: reserveTime,
         charge,
@@ -174,25 +171,21 @@ module.exports.handler = async (event, context) => {
     }
 
     const checkoutTime = moment().tz(TIMEZONE);
-    const generatedId = context.awsRequestId.toString();
 
     const { charge, paymentId } = await ParkingService.processCheckout(
       reservation,
       checkoutTime,
-      generatedId,
-      reservation.email
+      context.awsRequestId.toString(),
+      reservation.userEmail
     );
 
     await ParkingService.saveReservationHistory(
-      generatedId,
+      reservation.id,
       paymentId,
       spaceNumber,
       checkoutTime,
       reservation.reserve_time,
-      charge,
-      reservation.space_no,
-      reservation.email,
-      "Uncompleted")
+      reservation.userEmail)
 
     return createResponse(200, {
       success: true,
