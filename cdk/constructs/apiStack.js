@@ -64,7 +64,12 @@ class ApiStack extends Stack {
       },
     });
 
-
+    makeReservation.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['ses:SendEmail'],
+        resources: ['*'],
+      })
+    );
 
     parkingSpaceTable.grantReadWriteData(makeReservation);
     reservationTable.grantReadWriteData(makeReservation);
