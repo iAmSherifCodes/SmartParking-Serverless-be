@@ -1,14 +1,17 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
+const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
 const { RestApi, LambdaIntegration, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
-const { EmailIdentity } = require('aws-cdk-lib/aws-ses')
+const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
 class ApiStack extends Stack {
   constructor(scope, id, props) {
     super(scope, id, props);
 
     const origins = ["http://localhost:3002"];
+    const verifiedEmail = 'cashgraphicx@gmail.com';
+    const companyName = "Smart Park"
 
     const restApi = new RestApi(this, `${props.stageName}-MyApi`, {
       deployOptions: {
@@ -29,7 +32,7 @@ class ApiStack extends Stack {
     });
 
     const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
-      identity: ses.Identity.email('awofiranyesherif4@gmail.com'),
+      identity: Identity.email(verifiedEmail),
     });
 
     const parkingSpaceTable = props.parkingSpaceTable;
@@ -56,8 +59,12 @@ class ApiStack extends Stack {
       environment: {
         PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
         RESERVATION_TABLE: reservationTable.tableName,
+        COMPANY_NAME: companyName,
+        VERIFIED_EMAIL: verifiedEmail
       },
     });
+
+
 
     parkingSpaceTable.grantReadWriteData(makeReservation);
     reservationTable.grantReadWriteData(makeReservation);
