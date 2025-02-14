@@ -5,10 +5,12 @@ const {
   PutCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+const sesClient = new SESClient({ region: "us-east-1" });
 const moment = require("moment-timezone");
 
 const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
-const { PARKING_SPACE_TABLE: parkingSpaceTable, RESERVATION_TABLE: reservationTable } = process.env;
+const { PARKING_SPACE_TABLE: parkingSpaceTable, RESERVATION_TABLE: reservationTable, VERIFIED_EMAIL: verifiedEmail, COMPANY_NAME:companyName } = process.env;
 
 
 const TIMEZONE = "Africa/Lagos";
@@ -111,6 +113,25 @@ module.exports.handler = async (event, context) => {
       context.awsRequestId.toString(),
       email
     );
+
+    // send email to user
+    const emailParams = {
+      Destination: {
+        ToAddresses: [email]
+      },
+      Message: {
+        Body: {
+          Text: {
+            Data: `Your parking space ${spaceNumber} has been reserved for ${reservationTime.format()}`
+          }
+        },
+        Subject: {
+          Data: `${companyName}: Parking Space Reservation`
+        }
+      },
+      Source: verifiedEmail
+    };
+    await sesClient.send(new SendEmailCommand(emailParams));
 
     return createResponse(200, {
       success: true,
