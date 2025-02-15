@@ -31,18 +31,20 @@ class ParkingService {
     return { id, spaceNumber, reserveTime, email };
   }
 
-  static async updateReserveTable(spaceNumber) {
+  static async updateReserveTable(spaceNumber, date) {
     const params = {
       TableName: parkingSpaceTable,
       Key: { space_no: spaceNumber },
-      UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
+      UpdateExpression: "SET #is_reserved = :reserved, #status = :status, #reserved_date = :date",
       ExpressionAttributeNames: {
         "#status": "status",
-        "#is_reserved": "reserved"
+        "#is_reserved": "reserved",
+        "#reserved_date": "date",
       },
       ExpressionAttributeValues: {
         ":reserved": true,
-        ":status": STATUS.RESERVED
+        ":status": STATUS.RESERVED,
+        ":date": date
       },
       ReturnValues: "ALL_NEW"
     };
@@ -106,7 +108,7 @@ module.exports.handler = async (event, context) => {
       });
     }
 
-    await ParkingService.updateReserveTable(spaceNumber);
+    await ParkingService.updateReserveTable(spaceNumber, reserveTime);
     const reservation = await ParkingService.saveReservation(
       spaceNumber,
       reservationTime.format(),
@@ -115,23 +117,23 @@ module.exports.handler = async (event, context) => {
     );
 
     // send email to user
-    const emailParams = {
-      Destination: {
-        ToAddresses: [email]
-      },
-      Message: {
-        Body: {
-          Text: {
-            Data: `Your parking space ${spaceNumber} has been reserved for ${reservationTime.format()}`
-          }
-        },
-        Subject: {
-          Data: `${companyName}: Parking Space Reservation`
-        }
-      },
-      Source: verifiedEmail
-    };
-    await sesClient.send(new SendEmailCommand(emailParams));
+    // const emailParams = {
+    //   Destination: {
+    //     ToAddresses: [email]
+    //   },
+    //   Message: {
+    //     Body: {
+    //       Text: {
+    //         Data: `Your parking space ${spaceNumber} has been reserved for ${reservationTime.format()}`
+    //       }
+    //     },
+    //     Subject: {
+    //       Data: `${companyName}: Parking Space Reservation`
+    //     }
+    //   },
+    //   Source: verifiedEmail
+    // };
+    // await sesClient.send(new SendEmailCommand(emailParams));
 
     return createResponse(200, {
       success: true,
