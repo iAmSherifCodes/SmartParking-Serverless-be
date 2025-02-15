@@ -89,7 +89,7 @@ function createResponse(statusCode, body) {
             'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
             'Access-Control-Allow-Credentials': true,
             'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'POST'
+            'Access-Control-Allow-Methods': 'POST, OPTIONS'
         }
     };
 }
