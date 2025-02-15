@@ -50,7 +50,7 @@ class ApiStack extends Stack {
       },
     });
 
-    parkingSpaceTable.grantReadData(viewAvailableSpots);
+    parkingSpaceTable.grantReadWriteData(viewAvailableSpots);
 
     const makeReservation = new NodejsFunction(this, "MakeReservation", {
       runtime: Runtime.NODEJS_20_X,
@@ -97,7 +97,7 @@ class ApiStack extends Stack {
       entry: 'functions/initiatePayment.js',
       environment: {
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        FLW_SECRET_KEY: "XXXXXXXXXXXX"
+        FLW_SECRET_KEY: "FLWSECK_TEST-d98900bcf1bc84b659a91ce565febe08-X"
       },
     });
 
