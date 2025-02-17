@@ -5,7 +5,11 @@ const {
 } = require("@aws-sdk/lib-dynamodb");
 const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
-const { PAYMENT_HISTORY_TABLE: paymentHistoryTable, RESERVATION_HISTORY_TABLE: reservationHistoryTable } = process.env;
+const { PAYMENT_HISTORY_TABLE: paymentHistoryTable,
+    // RESERVATION_HISTORY_TABLE: reservationHistoryTable,
+    PARKING_SPACE_TABLE: parkingSpaceTable,
+  RESERVATION_TABLE: reservationTable } = process.env;
+const axios = require('axios');
 
 
 const ALLOWED_ORIGINS = ['http://localhost:3002'];
@@ -18,6 +22,31 @@ const fetchPaymentDetails = async (paymentId) => {
     const { Item } = await dynamodb.send(new GetCommand(params));
     return Item;
 };
+
+const updateReserveTable = async (spaceNumber, checkoutDate) => {
+    const params = {
+        TableName: parkingSpaceTable,
+        Key: { space_no: spaceNumber },
+        UpdateExpression: 'SET reserved = :reserved, :checkoutDate',
+        ExpressionAttributeValues: {
+            ':reserved': true,
+            ':checkoutDate': checkoutDate
+        },
+        ReturnValues: 'ALL_NEW'
+    };
+
+  return dynamodb.send(new UpdateCommand(params));
+}
+
+const saveReservation = async (spaceNumber, checkoutTime, id, userEmail) => {
+  const params = {
+    TableName: reservationTable,
+      Item: { id, spaceNumber, checkoutTime, userEmail }
+  };
+
+  await dynamodb.send(new PutCommand(params));
+    return { id, spaceNumber, checkoutTime, email };
+}
 
 const updatePaymentStatus = async (paymentId, status) => {
     try {
@@ -60,10 +89,26 @@ module.exports.handler = async (event, context) => {
             if(!paymentDetails){
                 throw new Error("Payment details not found");
             }
-            await updatePaymentStatus(data.tx_ref, data.status);
-            if (data.status === "successful") {
+            const response = await axios.get(
+                `https://api.flutterwave.com/v3/transactions/${data.id}/verify`, {
+                headers: {
+                    Authorization: `Bearer ${FLW_SECRET_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            await updatePaymentStatus(response.data.tx_ref, response.data.status);
+            if (response.data.status === "successful") {
+
+                await updateReserveTable(spaceNumber, reserveTime);
+                const reservation = await saveReservation(
+                  spaceNumber,
+                  formattedCheckoutTime.format(),
+                  context.awsRequestId.toString(),
+                  email
+                );
+  
                 // send notification to user
-                return createResponse(200, event.body);
+                return createResponse(200, response);
             }
         } else {
 
@@ -98,4 +143,3 @@ function createResponse(statusCode, body) {
 // TODO
 // secure apis
 // SAVE KEYS TO SSM PARAMETER STORE and implement caching
-// 
