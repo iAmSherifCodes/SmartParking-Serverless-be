@@ -9,8 +9,8 @@ const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 const moment = require("moment-timezone");
 
 const TIMEZONE = "Africa/Lagos";
-const RATE_PER_30_MINS = 305.99;
-const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
+// const RATE_PER_30_MINS = 305.99;
+// const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 const ALLOWED_ORIGINS = ['http://localhost:3002'];
 
 const {
@@ -67,55 +67,55 @@ class ParkingService {
 
 
 
-  static calculateCharge(reserveTime, checkoutTime) {
-    const reservationDateTime = new Date(reserveTime);
-    const checkoutDateTime = new Date(checkoutTime);
-    const timeDifference = checkoutDateTime - reservationDateTime;
-    if (timeDifference < 0) {
-      return RATE_PER_30_MINS;
-    } else if (timeDifference < THIRTY_MINUTES_IN_MS) {
-      return RATE_PER_30_MINS;
-    } else {
-      const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
-      return numberOf30Mins === 0 ? RATE_PER_30_MINS : numberOf30Mins * RATE_PER_30_MINS;
-    }
-  }
+  // static calculateCharge(reserveTime, checkoutTime) {
+  //   const reservationDateTime = new Date(reserveTime);
+  //   const checkoutDateTime = new Date(checkoutTime);
+  //   const timeDifference = checkoutDateTime - reservationDateTime;
+  //   if (timeDifference < 0) {
+  //     return RATE_PER_30_MINS;
+  //   } else if (timeDifference < THIRTY_MINUTES_IN_MS) {
+  //     return RATE_PER_30_MINS;
+  //   } else {
+  //     const numberOf30Mins = Math.floor(timeDifference / THIRTY_MINUTES_IN_MS);
+  //     return numberOf30Mins === 0 ? RATE_PER_30_MINS : numberOf30Mins * RATE_PER_30_MINS;
+  //   }
+  // }
 
-  static async saveBill(spaceNumber, reserveTime, checkoutTime, charge, id, email) {
-    const params = {
-      TableName: paymentHistoryTable,
-      Item: {
-        id,
-        userEmail: email,
-        space_no: spaceNumber,
-        reserve_time: reserveTime,
-        charge,
-        checkout_time: checkoutTime,
-        paymentStatus: "unsuccessful",
-      },
-    };
+  // static async saveBill(spaceNumber, reserveTime, checkoutTime, charge, id, email) {
+  //   const params = {
+  //     TableName: paymentHistoryTable,
+  //     Item: {
+  //       id,
+  //       userEmail: email,
+  //       space_no: spaceNumber,
+  //       reserve_time: reserveTime,
+  //       charge,
+  //       checkout_time: checkoutTime,
+  //       paymentStatus: "unsuccessful",
+  //     },
+  //   };
 
-    await dynamodb.send(new PutCommand(params));
-    return { id };
-  }
+  //   await dynamodb.send(new PutCommand(params));
+  //   return { id };
+  // }
 
-  static async updateSpaceStatus(spaceNumber, isReserved = false) {
-    const params = {
-      TableName: parkingSpaceTable,
-      Key: { space_no: spaceNumber },
-      UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
-      ExpressionAttributeNames: {
-        "#status": "status",
-        "#is_reserved": "reserved",
-      },
-      ExpressionAttributeValues: {
-        ":reserved": isReserved,
-        ":status": isReserved ? "reserved" : "available",
-      },
-    };
+  // static async updateSpaceStatus(spaceNumber, isReserved = false) {
+  //   const params = {
+  //     TableName: parkingSpaceTable,
+  //     Key: { space_no: spaceNumber },
+  //     UpdateExpression: "SET #is_reserved = :reserved, #status = :status",
+  //     ExpressionAttributeNames: {
+  //       "#status": "status",
+  //       "#is_reserved": "reserved",
+  //     },
+  //     ExpressionAttributeValues: {
+  //       ":reserved": isReserved,
+  //       ":status": isReserved ? "reserved" : "available",
+  //     },
+  //   };
 
-    await dynamodb.send(new UpdateCommand(params));
-  }
+  //   await dynamodb.send(new UpdateCommand(params));
+  // }
 
   static async deleteReservation(reservationId) {
     const params = {
