@@ -58,21 +58,23 @@ class ApiStack extends Stack {
       entry: 'functions/makeReservation.js',
       environment: {
         PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
-        RESERVATION_TABLE: reservationTable.tableName,
-        COMPANY_NAME: companyName,
-        VERIFIED_EMAIL: verifiedEmail
+        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
+        // COMPANY_NAME: companyName,
+        // VERIFIED_EMAIL: verifiedEmail
       },
     });
 
-    makeReservation.addToRolePolicy(
-      new PolicyStatement({
-        actions: ['ses:SendEmail'],
-        resources: ['*'],
-      })
-    );
+    // makeReservation.addToRolePolicy(
+    //   new PolicyStatement({
+    //     actions: ['ses:SendEmail'],
+    //     resources: ['*'],
+    //   })
+    // );
 
     parkingSpaceTable.grantReadWriteData(makeReservation);
-    reservationTable.grantReadWriteData(makeReservation);
+    // reservationTable.grantReadWriteData(makeReservation);
+    paymentHistoryTable.grantReadWriteData(makeReservation);
+
 
     const checkOutFunction = new NodejsFunction(this, "CheckOut", {
       runtime: Runtime.NODEJS_20_X,
@@ -109,11 +111,14 @@ class ApiStack extends Stack {
       entry: 'functions/webhookListener.js',
       environment: {
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        RESERVATION_HISTORY_TABLE: reservationHistory.tableName
+        RESERVATION_HISTORY_TABLE: reservationHistory.tableName,
+        RESERVATION_TABLE: reservationTable.tableNam
       },
     });
 
     paymentHistoryTable.grantReadWriteData(webhookListener);
+    parkingSpaceTable.grantWriteData(webhookListener);
+    reservationTable.grantWriteData(webhookListener);
 
     const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(viewAvailableSpots);
     const makeReservationLambdaIntegration = new LambdaIntegration(makeReservation);
