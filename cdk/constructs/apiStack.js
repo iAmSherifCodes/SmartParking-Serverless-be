@@ -1,7 +1,7 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
 const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
-const { RestApi, LambdaIntegration, JsonSchemaVersion, JsonSchemaType, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
+const { RestApi, Model, LambdaIntegration, JsonSchemaVersion, JsonSchemaType, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
 const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
