@@ -1,9 +1,9 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
-const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
+// const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
 const { RestApi, Model, LambdaIntegration, JsonSchemaVersion, JsonSchemaType, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
-const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
+// const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
 class ApiStack extends Stack {
   constructor(scope, id, props) {
@@ -42,11 +42,11 @@ class ApiStack extends Stack {
       }
     );
 
-    const makeReservationModel = new Model(this, "MakeReservationModel", {
+    const makeReservationApiModel = new Model(this, "makeReservationApiModel", {
       restApi: restApi,
       contentType: "application/json",
       description: "Validate MakeReservation Function Request Body",
-      modelName: "MakeReservationModel",
+      modelName: "makeReservationApiModel",
       schema: {
         schema: JsonSchemaVersion.DRAFT4,
         title: "ModelValidator",
@@ -70,11 +70,30 @@ class ApiStack extends Stack {
       },
     });
 
-
-
-    const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
-      identity: Identity.email(verifiedEmail),
+    const initiatePaymentApiModel = new Model(this, "initiatePaymentApiModel", {
+      restApi: restApi,
+      contentType: "application/json",
+      description: "Validate initiatePayment Function Request Body",
+      modelName: "initiatePaymentApiModel",
+      schema: {
+        schema: JsonSchemaVersion.DRAFT4,
+        title: "initiatePaymentApiModel",
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          paymentId: {
+            type: JsonSchemaType.STRING,
+            minLength: 5,
+          }
+        },
+        required: ["paymentId"],
+      },
     });
+
+
+
+    // const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
+    //   identity: Identity.email(verifiedEmail),
+    // });
 
     const parkingSpaceTable = props.parkingSpaceTable;
     const reservationTable = props.reservationTable;
@@ -181,17 +200,21 @@ class ApiStack extends Stack {
 
     restApi.root
       .addResource("available-spaces")
-      .addMethod("GET", viewAvailableSpotsLambdaIntegration,
-        {
-          requestValidator: requestValidator,
-          requestModels:{
-            "application/json": makeReservationModel,
-          }
-        }
+      .addMethod("GET", viewAvailableSpotsLambdaIntegration
       );
 
-    restApi.root.addResource("reserve").addMethod("POST", makeReservationLambdaIntegration);
-    restApi.root.addResource("pay").addMethod("POST", initiatePaymentIntegration);
+    restApi.root.addResource("reserve").addMethod("POST", makeReservationLambdaIntegration, {
+      requestValidator: requestValidator,
+      requestModels: {
+        "application/json": makeReservationApiModel
+      }
+    });
+    restApi.root.addResource("pay").addMethod("POST", initiatePaymentIntegration, {
+      requestValidator: requestValidator,
+      requestModels: {
+        "application/json": initiatePaymentApiModel
+      }
+    });
     // restApi.root
     //   .addResource("reserve")
     //   .addMethod("POST", makeReservationLambdaIntegration,{
