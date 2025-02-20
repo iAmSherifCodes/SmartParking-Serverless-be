@@ -89,6 +89,33 @@ class ApiStack extends Stack {
       },
     });
 
+    const webhookListenerApiModel = new Model(this, "webhookListenerApiModel", {
+      restApi: restApi,
+      contentType: "application/json",
+      description: "Validate webhookListener Function Request Body",
+      modelName: "webhookListenerApiModel",
+      schema: {
+        schema: JsonSchemaVersion.DRAFT4,
+        title: "webhookListenerApiModel",
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          event: {
+            type: JsonSchemaType.STRING,
+            minLength: 5,
+          },
+          data: {
+            type: JsonSchemaType.OBJECT,
+            minLength: 5,
+          },
+          card: {
+            type: JsonSchemaType.OBJECT,
+            minLength: 5,
+          }
+        },
+        required: ["event", "data", "card"],
+      },
+    });
+
 
 
     // const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
@@ -229,7 +256,11 @@ class ApiStack extends Stack {
 
     restApi.root
       .addResource("webhook")
-      .addMethod("POST", webhookListenerIntegration);
+      .addMethod("POST", webhookListenerIntegration, {
+        requestValidator: requestValidator,
+        requestModels: {
+          "application/json": webhookListenerApiModel
+        }});
 
     new CfnOutput(this, "url", {
       value: restApi.url,
