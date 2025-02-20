@@ -81,8 +81,8 @@ class ParkingService {
     } else if (timeDifference < TEN_MINUTES_IN_MS) {
       return RATE_PER_10_MINS;
     } else {
-      const numberOf30Mins = Math.round(timeDifference / TEN_MINUTES_IN_MS);
-      return numberOf30Mins === 0 ? RATE_PER_10_MINS : numberOf30Mins * RATE_PER_10_MINS;
+      const numberOf10Mins = Math.round(timeDifference / TEN_MINUTES_IN_MS);
+      return numberOf10Mins === 0 ? RATE_PER_10_MINS : numberOf10Mins * RATE_PER_10_MINS;
     }
   }
 
