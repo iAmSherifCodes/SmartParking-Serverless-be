@@ -78,7 +78,7 @@ module.exports.handler = async (event, context) => {
 
         if (response.data.status === 'success') {
             console.log('Card Charge In Progress', response.data);
-            await updatePaymentStatus(body.paymentId, 'In Progress');
+            await updatePaymentStatus(body.paymentId, 'unprocessed');
             return createResponse(200, response.data);
         } else {
             console.log('Card Charge Failed', response);
