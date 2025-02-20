@@ -1,7 +1,7 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
 const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
-const { RestApi, LambdaIntegration, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
+const { RestApi, LambdaIntegration, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
 const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
@@ -30,6 +30,19 @@ class ApiStack extends Stack {
         maxAge: Duration.days(1),
       },
     });
+
+    const requestValidator = new RequestValidator(
+      this,
+      `${companyName}- RequestValidator`,
+      {
+        restApi: restApi,
+        requestValidatorName: "requestBodyValidator",
+        validateRequestBody: true,
+        validateRequestParameters: false,
+      }
+    );
+
+    
 
     const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
       identity: Identity.email(verifiedEmail),
