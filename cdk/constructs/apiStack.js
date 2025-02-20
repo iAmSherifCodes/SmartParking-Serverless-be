@@ -1,7 +1,7 @@
 const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
 const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
 const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
-const { RestApi, LambdaIntegration, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
+const { RestApi, LambdaIntegration, JsonSchemaVersion, JsonSchemaType, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
 const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
@@ -42,7 +42,35 @@ class ApiStack extends Stack {
       }
     );
 
-    
+    const makeReservationModel = new Model(this, "MakeReservationModel", {
+      restApi: restApi,
+      contentType: "application/json",
+      description: "Validate MakeReservation Function Request Body",
+      modelName: "MakeReservationModel",
+      schema: {
+        schema: JsonSchemaVersion.DRAFT4,
+        title: "ModelValidator",
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          checkoutTime: {
+            type: JsonSchemaType.STRING,
+            minLength: 19,
+          },
+          spaceNumber: {
+            type: JsonSchemaType.STRING,
+            maxLength: 2,
+            minLength: 2,
+          },
+          email: {
+            type: JsonSchemaType.STRING,
+            pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+          }
+        },
+        required: ["checkoutTime", "spaceNumber", "email"],
+      },
+    });
+
+
 
     const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
       identity: Identity.email(verifiedEmail),
@@ -153,7 +181,9 @@ class ApiStack extends Stack {
 
     restApi.root
       .addResource("available-spaces")
-      .addMethod("GET", viewAvailableSpotsLambdaIntegration);
+      .addMethod("GET", viewAvailableSpotsLambdaIntegration,
+
+      );
 
     restApi.root.addResource("reserve").addMethod("POST", makeReservationLambdaIntegration);
     restApi.root.addResource("pay").addMethod("POST", initiatePaymentIntegration);
