@@ -182,7 +182,12 @@ class ApiStack extends Stack {
     restApi.root
       .addResource("available-spaces")
       .addMethod("GET", viewAvailableSpotsLambdaIntegration,
-
+        {
+          requestValidator: requestValidator,
+          requestModels:{
+            "application/json": makeReservationModel,
+          }
+        }
       );
 
     restApi.root.addResource("reserve").addMethod("POST", makeReservationLambdaIntegration);
