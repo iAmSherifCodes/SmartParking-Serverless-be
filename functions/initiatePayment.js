@@ -1,113 +1,56 @@
-const axios = require('axios');
-const {
-    DynamoDBDocumentClient,
-    GetCommand,
-    UpdateCommand
-} = require("@aws-sdk/lib-dynamodb");
-const { DynamoDB } = require("@aws-sdk/client-dynamodb");
-const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
-const { PAYMENT_HISTORY_TABLE: paymentHistoryTable, FLW_SECRET_KEY } = process.env;
+const logger = require('../utils/logger');
+const ResponseBuilder = require('../utils/response');
+const { validateSchema, schemas } = require('../utils/schemaValidation');
+const ParkingService = require('../services/parkingService');
+const PaymentService = require('../services/paymentService');
+const config = require('../config/environment');
 
-
-const ALLOWED_ORIGINS = ['http://localhost:3002'];
-const FLUTTERWAVE_API = 'https://api.flutterwave.com/v3/payments';
-const fetchPaymentDetails = async (paymentId) => {
-    const params = {
-        TableName: paymentHistoryTable,
-        Key: { id: paymentId },
-    };
-
-    const { Item } = await dynamodb.send(new GetCommand(params));
-    return Item;
-};
-
-const updatePaymentStatus = async (paymentId, status) => {
-    try {
-        const params = {
-            TableName: paymentHistoryTable,
-            Key: { id: paymentId },
-            UpdateExpression: "SET #paymentStatus = :status",
-            ExpressionAttributeNames: {
-                "#paymentStatus": "paymentStatus",
-            },
-            ExpressionAttributeValues: {
-                ":status": status,
-            },
-        };
-
-        await dynamodb.send(new UpdateCommand(params));
-    } catch (error) {
-        console.error('Error updating payment status:', error);
-        throw error;
-    }
-
-};
+const parkingService = new ParkingService();
+const paymentService = new PaymentService();
 
 module.exports.handler = async (event, context) => {
+  try {
+    logger.info('Processing payment initiation request', { 
+      requestId: context.awsRequestId 
+    });
 
-    try {
-        const body = parseEventBody(event.body);
-        const paymentDetails = await fetchPaymentDetails(body.paymentId);
+    // Parse and validate request body
+    const body = JSON.parse(
+      typeof event.body === "string" ? event.body : JSON.stringify(event.body)
+    );
 
-        if (paymentDetails.paymentStatus === 'successful') {
-            return createResponse(400, { error: 'Payment already successful' });
-        }
+    const validatedData = validateSchema(schemas.initiatePayment, body);
 
-        const paymentData = {
-            currency: "NGN",
-            amount: paymentDetails.charge,
-            customer: {
-                email: paymentDetails.userEmail,
-            },
-            customizations: {
-                title: 'Smart Parking Payment',
-                description: "Please proceed to checkout"
-            },
-            tx_ref: body.paymentId,
-            redirect_url: "http://localhost:3002",
+    // Process payment initiation
+    const paymentDetails = await parkingService.processPayment(validatedData.paymentId);
 
-        };
+    // Initiate payment with Flutterwave
+    const paymentResult = await paymentService.initiatePayment({
+      amount: paymentDetails.charge,
+      email: paymentDetails.userEmail,
+      paymentId: validatedData.paymentId,
+      redirectUrl: config.cors.allowedOrigins[0],
+    });
 
-        const response = await axios.post(
-            FLUTTERWAVE_API, paymentData, {
-            headers: {
-                Authorization: `Bearer ${FLW_SECRET_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
+    logger.info('Payment initiation successful', { 
+      requestId: context.awsRequestId,
+      paymentId: validatedData.paymentId,
+      paymentLink: paymentResult.paymentLink 
+    });
 
-        if (response.data.status === 'success') {
-            console.log('Card Charge In Progress', response.data);
-            await updatePaymentStatus(body.paymentId, 'unprocessed');
-            return createResponse(200, response.data);
-        } else {
-            console.log('Card Charge Failed', response);
-            throw new Error(response);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        return createResponse(400, { error: error.message });
-    }
+    return ResponseBuilder.success({
+      paymentLink: paymentResult.paymentLink,
+      reference: paymentResult.reference,
+      amount: paymentDetails.charge,
+    }, 'Payment initiated successfully');
+
+  } catch (error) {
+    logger.error('Payment initiation error', {
+      requestId: context.awsRequestId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return ResponseBuilder.error(error);
+  }
 };
-
-function parseEventBody(body) {
-    return typeof body === "string" ? JSON.parse(body) : body;
-}
-
-function createResponse(statusCode, body) {
-    return {
-        statusCode,
-        body: JSON.stringify(body),
-        headers: {
-            'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
-            'Access-Control-Allow-Credentials': true,
-            'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        }
-    };
-}
-
-
-// TODO
-// secure apis
-// SAVE KEYS TO SSM PARAMETER STORE and implement caching
