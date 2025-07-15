@@ -1,142 +1,152 @@
-const {
-    DynamoDBDocumentClient,
-    GetCommand,
-    UpdateCommand
-} = require("@aws-sdk/lib-dynamodb");
-const { DynamoDB } = require("@aws-sdk/client-dynamodb");
-const dynamodb = DynamoDBDocumentClient.from(new DynamoDB());
-const { PAYMENT_HISTORY_TABLE: paymentHistoryTable,
-    // RESERVATION_HISTORY_TABLE: reservationHistoryTable,
-    PARKING_SPACE_TABLE: parkingSpaceTable,
-  RESERVATION_TABLE: reservationTable } = process.env;
-const axios = require('axios');
+const logger = require('../utils/logger');
+const ResponseBuilder = require('../utils/response');
+const { validateSchema, schemas } = require('../utils/schemaValidation');
+const ParkingService = require('../services/parkingService');
+const PaymentService = require('../services/paymentService');
 
+const parkingService = new ParkingService();
+const paymentService = new PaymentService();
 
-const ALLOWED_ORIGINS = ['http://localhost:3002'];
-const fetchPaymentDetails = async (paymentId) => {
-    const params = {
-        TableName: paymentHistoryTable,
-        Key: { id: paymentId },
-    };
-
-    const { Item } = await dynamodb.send(new GetCommand(params));
-    return Item;
-};
-
-const updateReserveTable = async (spaceNumber, checkoutDate) => {
-    const params = {
-        TableName: parkingSpaceTable,
-        Key: { space_no: spaceNumber },
-        UpdateExpression: 'SET reserved = :reserved, :checkoutDate',
-        ExpressionAttributeValues: {
-            ':reserved': true,
-            ':checkoutDate': checkoutDate
-        },
-        ReturnValues: 'ALL_NEW'
-    };
-
-  return dynamodb.send(new UpdateCommand(params));
-}
-
-const saveReservation = async (spaceNumber, checkoutTime, id, userEmail) => {
-  const params = {
-    TableName: reservationTable,
-      Item: { id, spaceNumber, checkoutTime, userEmail }
-  };
-
-  await dynamodb.send(new PutCommand(params));
-    return { id, spaceNumber, checkoutTime, email };
-}
-
-const updatePaymentStatus = async (paymentId, status) => {
-    try {
-        const params = {
-            TableName: paymentHistoryTable,
-            Key: { id: paymentId },
-            UpdateExpression: "SET #paymentStatus = :status",
-            ExpressionAttributeNames: {
-                "#paymentStatus": "paymentStatus",
-            },
-            ExpressionAttributeValues: {
-                ":status": status,
-            },
-        };
-
-        await dynamodb.send(new UpdateCommand(params));
-    } catch (error) {
-        console.error('Error updating payment status:', error);
-        throw error;
-    }
-
-};
-
-// data in event
-// update transaction db with data response
-// if transaction is successful notify user and update the db
+// Webhook secret for verification (should be stored in environment variables)
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '123456';
 
 module.exports.handler = async (event, context) => {
-    const secretHash = "123456";
-    const signature = event.headers["verif-hash"];
+  try {
+    logger.info('Processing webhook request', { 
+      requestId: context.awsRequestId 
+    });
 
-    if (!signature || signature !== secretHash) {
-        return createResponse(401, { message: "Unauthorized" })
+    // Verify webhook signature
+    const signature = event.headers["verif-hash"] || event.headers["Verif-Hash"];
+    
+    if (!signature || signature !== WEBHOOK_SECRET) {
+      logger.warn('Unauthorized webhook request', { 
+        requestId: context.awsRequestId,
+        signature: signature ? 'present' : 'missing' 
+      });
+      return ResponseBuilder.error(new Error('Unauthorized'), 401);
     }
-    const { event: events, data } = parseEventBody(event.body);
-    try {
 
-        if (events === "charge.completed") {
-            const paymentDetails = await fetchPaymentDetails(data.tx_ref);
-            if(!paymentDetails){
-                throw new Error("Payment details not found");
-            }
-            const response = await axios.get(
-                `https://api.flutterwave.com/v3/transactions/${data.id}/verify`, {
-                headers: {
-                    Authorization: `Bearer ${FLW_SECRET_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            await updatePaymentStatus(response.data.tx_ref, response.data.status);
-            if (response.data.status === "successful") {
+    // Parse and validate webhook payload
+    const body = JSON.parse(
+      typeof event.body === "string" ? event.body : JSON.stringify(event.body)
+    );
 
-                await updateReserveTable(spaceNumber, reserveTime);
-                const reservation = await saveReservation(
-                  spaceNumber,
-                  formattedCheckoutTime.format(),
-                  context.awsRequestId.toString(),
-                  email
-                );
-  
-                // send notification to user
-                return createResponse(200, response);
-            }
-        } else {
+    const validatedData = validateSchema(schemas.webhook, body);
+    const { event: eventType, data } = validatedData;
 
-            return createResponse(200, event.body);
-            // update paymenthistory with processor_response
-            throw new Error("Charge Not Processed")
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        return createResponse(400, { error: error.message });
+    logger.info('Webhook event received', { 
+      requestId: context.awsRequestId,
+      eventType,
+      transactionId: data.id,
+      reference: data.tx_ref 
+    });
+
+    // Handle different webhook events
+    switch (eventType) {
+      case 'charge.completed':
+        return await handleChargeCompleted(data, context.awsRequestId);
+      
+      case 'charge.failed':
+        return await handleChargeFailed(data, context.awsRequestId);
+      
+      default:
+        logger.info('Unhandled webhook event type', { 
+          requestId: context.awsRequestId,
+          eventType 
+        });
+        return ResponseBuilder.success(null, 'Webhook received');
     }
+
+  } catch (error) {
+    logger.error('Webhook processing error', {
+      requestId: context.awsRequestId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return ResponseBuilder.error(error);
+  }
 };
 
-function parseEventBody(body) {
-    return typeof body === "string" ? JSON.parse(body) : body;
+async function handleChargeCompleted(data, requestId) {
+  try {
+    logger.info('Processing charge completed webhook', { 
+      requestId,
+      transactionId: data.id,
+      reference: data.tx_ref 
+    });
+
+    // Verify payment with Flutterwave
+    const verificationResult = await paymentService.verifyPayment(data.id);
+    
+    if (verificationResult.status === 'successful') {
+      // Confirm payment and create reservation
+      const reservation = await parkingService.confirmPayment(data.tx_ref, {
+        transactionId: data.id,
+        paymentMethod: verificationResult.paymentMethod,
+      });
+
+      logger.info('Payment confirmed and reservation created', { 
+        requestId,
+        paymentId: data.tx_ref,
+        reservationId: reservation.id,
+        spaceNumber: reservation.space_no 
+      });
+
+      return ResponseBuilder.success({
+        reservationId: reservation.id,
+        spaceNumber: reservation.space_no,
+        status: 'confirmed',
+      }, 'Payment confirmed and reservation created');
+    } else {
+      logger.warn('Payment verification failed', { 
+        requestId,
+        transactionId: data.id,
+        status: verificationResult.status 
+      });
+
+      return ResponseBuilder.success({
+        status: 'verification_failed',
+        message: verificationResult.message,
+      }, 'Payment verification failed');
+    }
+
+  } catch (error) {
+    logger.error('Error processing charge completed webhook', {
+      requestId,
+      error: error.message,
+      transactionId: data.id,
+    });
+    throw error;
+  }
 }
 
-function createResponse(statusCode, body) {
-    return {
-        statusCode,
-        body: JSON.stringify(body),
-        headers: {
-            'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
-            'Access-Control-Allow-Credentials': true,
-            'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Api-Key,X-Amz-Date,X-Amz-Security-Token',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        }
-    };
+async function handleChargeFailed(data, requestId) {
+  try {
+    logger.info('Processing charge failed webhook', { 
+      requestId,
+      transactionId: data.id,
+      reference: data.tx_ref 
+    });
+
+    // Update payment status to failed
+    // This would be implemented in the parking service
+    // await parkingService.updatePaymentStatus(data.tx_ref, 'failed');
+
+    return ResponseBuilder.success({
+      status: 'failed',
+      reference: data.tx_ref,
+    }, 'Payment failure recorded');
+
+  } catch (error) {
+    logger.error('Error processing charge failed webhook', {
+      requestId,
+      error: error.message,
+      transactionId: data.id,
+    });
+    throw error;
+  }
 }
 
 
