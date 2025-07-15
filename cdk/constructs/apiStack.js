@@ -1,33 +1,82 @@
-const { CfnOutput, Stack, Duration } = require("aws-cdk-lib");
-const { Runtime, Function, Code } = require("aws-cdk-lib/aws-lambda");
-// const { PolicyStatement } = require("aws-cdk-lib/aws-iam");
-const { RestApi, Model, LambdaIntegration, JsonSchemaVersion, JsonSchemaType, RequestValidator, CfnAuthorizer, AuthorizationType } = require("aws-cdk-lib/aws-apigateway");
+const { CfnOutput, Stack, Duration, RemovalPolicy } = require("aws-cdk-lib");
+const { Runtime, Function, Code, Tracing, Architecture } = require("aws-cdk-lib/aws-lambda");
+const { PolicyStatement, Effect } = require("aws-cdk-lib/aws-iam");
+const { 
+  RestApi, 
+  Model, 
+  LambdaIntegration, 
+  JsonSchemaVersion, 
+  JsonSchemaType, 
+  RequestValidator, 
+  CfnAuthorizer, 
+  AuthorizationType,
+  MethodLoggingLevel,
+  AccessLogFormat,
+  LogGroupLogDestination
+} = require("aws-cdk-lib/aws-apigateway");
 const { NodejsFunction } = require("aws-cdk-lib/aws-lambda-nodejs");
+const { LogGroup, RetentionDays } = require("aws-cdk-lib/aws-logs");
+const { StringParameter } = require("aws-cdk-lib/aws-ssm");
 // const { EmailIdentity, Identity } = require('aws-cdk-lib/aws-ses')
 
 class ApiStack extends Stack {
-  constructor(scope, id, props) {
+  constructor(scope, id,  props) {
     super(scope, id, props);
 
-    const origins = ["http://localhost:3002"];
-    const verifiedEmail = 'cashgraphicx@gmail.com';
-    const companyName = "Smart Park"
+    const { stageName } = props;
+    const isProd = stageName === 'prod';
+    
+    // Environment-specific configuration
+    const origins = isProd 
+      ? ["https://smartpark.example.com"] 
+      : ["http://localhost:3002", "https://dev.smartpark.example.com"];
+    
+    const companyName = "Smart Park";
 
-    const restApi = new RestApi(this, `${props.stageName}-MyApi`, {
+    // Create CloudWatch Log Group for API Gateway
+    const apiLogGroup = new LogGroup(this, 'ApiGatewayLogGroup', {
+      logGroupName: `/aws/apigateway/smartparking-${stageName}`,
+      retention: isProd ? RetentionDays.ONE_MONTH : RetentionDays.ONE_WEEK,
+      removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    // Create REST API with enhanced configuration
+    const restApi = new RestApi(this, `SmartParking-API-${stageName}`, {
+      restApiName: `SmartParking-API-${stageName}`,
+      description: `Smart Parking REST API - ${stageName}`,
       deployOptions: {
-        stageName: props.stageName,
+        stageName,
+        loggingLevel: MethodLoggingLevel.INFO,
+        dataTraceEnabled: !isProd, // Disable in production for security
+        metricsEnabled: true,
+        accessLogDestination: new LogGroupLogDestination(apiLogGroup),
+        accessLogFormat: AccessLogFormat.jsonWithStandardFields({
+          caller: true,
+          httpMethod: true,
+          ip: true,
+          protocol: true,
+          requestTime: true,
+          resourcePath: true,
+          responseLength: true,
+          status: true,
+          user: true,
+        }),
       },
       defaultCorsPreflightOptions: {
         allowOrigins: origins,
-        allowMethods: ['GET', 'POST', 'OPTIONS'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowHeaders: [
           'Content-Type',
           'Authorization',
           'Accept',
-          'X-Requested-With'
+          'X-Requested-With',
+          'X-Api-Key'
         ],
         allowCredentials: true,
-        maxAge: Duration.days(1),
+        maxAge: Duration.hours(1),
+      },
+      endpointConfiguration: {
+        types: [require('aws-cdk-lib/aws-apigateway').EndpointType.REGIONAL]
       },
     });
 
@@ -54,7 +103,7 @@ class ApiStack extends Stack {
         properties: {
           checkoutTime: {
             type: JsonSchemaType.STRING,
-            minLength: 19,
+            minLength: 16, // Allow shorter date formats like "2025-07-16T01:00"
           },
           spaceNumber: {
             type: JsonSchemaType.STRING,
@@ -101,111 +150,185 @@ class ApiStack extends Stack {
         properties: {
           event: {
             type: JsonSchemaType.STRING,
-            minLength: 5,
+            maxLength: 16,
+            minLength: 16,
           },
           data: {
             type: JsonSchemaType.OBJECT,
-            minLength: 5,
+            // minProperties: 10
+            
           },
-          card: {
-            type: JsonSchemaType.OBJECT,
-            minLength: 5,
-          }
         },
-        required: ["event", "data", "card"],
+        required: ["event", "data"],
       },
     });
 
 
 
-    // const emailIdentity = new EmailIdentity(this, 'SmartParkEmailNotification', {
-    //   identity: Identity.email(verifiedEmail),
-    // });
+    // Store sensitive configuration in SSM Parameter Store
+    const flutterwaveSecretParam = StringParameter.fromStringParameterName(
+      this,
+      'FlutterwaveSecretParam',
+      `/smartparking/${stageName}/flutterwave-secret-key`
+    );
 
+    const webhookSecretParam = StringParameter.fromStringParameterName(
+      this,
+      'WebhookSecretParam',
+      `/smartparking/${stageName}/webhook-secret`
+    );
+
+    // Database table references
     const parkingSpaceTable = props.parkingSpaceTable;
     const reservationTable = props.reservationTable;
     const paymentHistoryTable = props.paymentHistoryTable;
     const reservationHistory = props.reservationHistory;
 
-    const viewAvailableSpots = new Function(this, "ViewAvailableSpots", {
+    // Common Lambda configuration
+    const commonLambdaProps = {
       runtime: Runtime.NODEJS_20_X,
-      handler: "viewAvailableSpots.handler",
-      code: Code.fromAsset("functions"),
+      architecture: Architecture.X86_64, // Use x86_64 for better compatibility
       timeout: Duration.seconds(30),
+      memorySize: 512,
+      tracing: Tracing.ACTIVE, // Enable X-Ray tracing
       environment: {
-        TABLE_NAME: parkingSpaceTable.tableName,
-      },
-    });
-
-    parkingSpaceTable.grantReadWriteData(viewAvailableSpots);
-
-    const makeReservation = new NodejsFunction(this, "MakeReservation", {
-      runtime: Runtime.NODEJS_20_X,
-      handler: "handler",
-      entry: 'functions/makeReservation.js',
-      environment: {
+        NODE_ENV: stageName,
+        STAGE_NAME: stageName,
+        COMPANY_NAME: companyName,
+        TIMEZONE: 'Africa/Lagos',
+        RATE_PER_10_MINS: '105.99',
+        ALLOWED_ORIGINS: origins.join(','),
         PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
-        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        // COMPANY_NAME: companyName,
-        // VERIFIED_EMAIL: verifiedEmail
-      },
-    });
-
-    // makeReservation.addToRolePolicy(
-    //   new PolicyStatement({
-    //     actions: ['ses:SendEmail'],
-    //     resources: ['*'],
-    //   })
-    // );
-
-    parkingSpaceTable.grantReadWriteData(makeReservation);
-    // reservationTable.grantReadWriteData(makeReservation);
-    paymentHistoryTable.grantReadWriteData(makeReservation);
-
-
-    const checkOutFunction = new NodejsFunction(this, "CheckOut", {
-      runtime: Runtime.NODEJS_20_X,
-      handler: "handler",
-      entry: 'functions/checkOut.js',
-      environment: {
         RESERVATION_TABLE: reservationTable.tableName,
         PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        PARKING_SPACE_TABLE: parkingSpaceTable.tableName,
-        RESERVATION_HISTORY_TABLE: reservationHistory.tableName
+        RESERVATION_HISTORY_TABLE: reservationHistory.tableName,
+        LOG_LEVEL: isProd ? 'info' : 'debug',
+        ENABLE_X_RAY_TRACING: 'true',
+      },
+      bundling: {
+        minify: isProd,
+        sourceMap: !isProd,
+        target: 'node20',
+        externalModules: ['@aws-sdk/*'], // Use AWS SDK from Lambda runtime
+        forceDockerBundling: false, // Disable Docker bundling to avoid platform issues
+      },
+    };
+
+    // Create CloudWatch Log Groups for Lambda functions
+    const createLogGroup = (functionName) => new LogGroup(this, `${functionName}LogGroup`, {
+      logGroupName: `/aws/lambda/smartparking-${stageName}-${functionName.toLowerCase()}`,
+      retention: isProd ? RetentionDays.ONE_MONTH : RetentionDays.ONE_WEEK,
+      removalPolicy: isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    // View Available Spots Function
+    const viewAvailableSpotsLogGroup = createLogGroup('ViewAvailableSpots');
+    const viewAvailableSpots = new NodejsFunction(this, "ViewAvailableSpots", {
+      ...commonLambdaProps,
+      functionName: `smartparking-${stageName}-view-available-spots`,
+      entry: 'functions/viewAvailableSpots.js',
+      description: 'Retrieve available parking spaces',
+      logGroup: viewAvailableSpotsLogGroup,
+      environment: {
+        ...commonLambdaProps.environment,
+        TABLE_NAME: parkingSpaceTable.tableName, // Legacy support
       },
     });
 
+    parkingSpaceTable.grantReadData(viewAvailableSpots);
+
+    // Make Reservation Function
+    const makeReservationLogGroup = createLogGroup('MakeReservation');
+    const makeReservation = new NodejsFunction(this, "MakeReservation", {
+      ...commonLambdaProps,
+      functionName: `smartparking-${stageName}-make-reservation`,
+      entry: 'functions/makeReservation.js',
+      description: 'Create parking space reservation',
+      logGroup: makeReservationLogGroup,
+    });
+
+    // Grant permissions
+    parkingSpaceTable.grantReadData(makeReservation);
+    paymentHistoryTable.grantReadWriteData(makeReservation);
+    reservationTable.grantReadWriteData(makeReservation);
+
+    // Check Out Function
+    const checkOutLogGroup = createLogGroup('CheckOut');
+    const checkOutFunction = new NodejsFunction(this, "CheckOut", {
+      ...commonLambdaProps,
+      functionName: `smartparking-${stageName}-checkout`,
+      entry: 'functions/checkOut.js',
+      description: 'Process parking space checkout',
+      logGroup: checkOutLogGroup,
+    });
+
+    // Grant permissions
     reservationTable.grantReadWriteData(checkOutFunction);
     paymentHistoryTable.grantReadWriteData(checkOutFunction);
-    parkingSpaceTable.grantWriteData(checkOutFunction);
+    parkingSpaceTable.grantReadWriteData(checkOutFunction);
     reservationHistory.grantReadWriteData(checkOutFunction);
 
+    // Initiate Payment Function
+    const initiatePaymentLogGroup = createLogGroup('InitiatePayment');
     const initiatePayment = new NodejsFunction(this, "InitiatePayment", {
-      runtime: Runtime.NODEJS_20_X,
-      handler: "handler",
+      ...commonLambdaProps,
+      functionName: `smartparking-${stageName}-initiate-payment`,
       entry: 'functions/initiatePayment.js',
+      description: 'Initiate payment with Flutterwave',
+      logGroup: initiatePaymentLogGroup,
       environment: {
-        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        FLW_SECRET_KEY: "FLWSECK_TEST-d98900bcf1bc84b659a91ce565febe08-X"
+        ...commonLambdaProps.environment,
+        FLW_SECRET_KEY_PARAM: flutterwaveSecretParam.parameterName,
       },
     });
 
+    // Grant permissions
     paymentHistoryTable.grantReadWriteData(initiatePayment);
+    flutterwaveSecretParam.grantRead(initiatePayment);
 
+    // Add policy for SSM parameter access
+    initiatePayment.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ['ssm:GetParameter'],
+        resources: [flutterwaveSecretParam.parameterArn],
+      })
+    );
+
+    // Webhook Listener Function
+    const webhookListenerLogGroup = createLogGroup('WebhookListener');
     const webhookListener = new NodejsFunction(this, "WebhookListener", {
-      runtime: Runtime.NODEJS_20_X,
-      handler: "handler",
+      ...commonLambdaProps,
+      functionName: `smartparking-${stageName}-webhook-listener`,
       entry: 'functions/webhookListener.js',
+      description: 'Handle payment webhook events',
+      logGroup: webhookListenerLogGroup,
       environment: {
-        PAYMENT_HISTORY_TABLE: paymentHistoryTable.tableName,
-        RESERVATION_HISTORY_TABLE: reservationHistory.tableName,
-        RESERVATION_TABLE: reservationTable.tableNam
+        ...commonLambdaProps.environment,
+        WEBHOOK_SECRET_PARAM: webhookSecretParam.parameterName,
+        FLW_SECRET_KEY_PARAM: flutterwaveSecretParam.parameterName,
       },
     });
 
+    // Grant permissions
     paymentHistoryTable.grantReadWriteData(webhookListener);
-    parkingSpaceTable.grantWriteData(webhookListener);
-    reservationTable.grantWriteData(webhookListener);
+    parkingSpaceTable.grantReadWriteData(webhookListener);
+    reservationTable.grantReadWriteData(webhookListener);
+    reservationHistory.grantReadWriteData(webhookListener);
+    webhookSecretParam.grantRead(webhookListener);
+    flutterwaveSecretParam.grantRead(webhookListener);
+
+    // Add policy for SSM parameter access
+    webhookListener.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ['ssm:GetParameter'],
+        resources: [
+          webhookSecretParam.parameterArn,
+          flutterwaveSecretParam.parameterArn,
+        ],
+      })
+    );
 
     const viewAvailableSpotsLambdaIntegration = new LambdaIntegration(viewAvailableSpots);
     const makeReservationLambdaIntegration = new LambdaIntegration(makeReservation);
@@ -262,14 +385,40 @@ class ApiStack extends Stack {
           "application/json": webhookListenerApiModel
         }});
 
-    new CfnOutput(this, "url", {
+    // API Gateway Outputs
+    new CfnOutput(this, "ApiUrl", {
       value: restApi.url,
+      description: `Smart Parking API URL - ${stageName}`,
+      exportName: `SmartParking-API-URL-${stageName}`,
+    });
+
+    new CfnOutput(this, "ApiId", {
+      value: restApi.restApiId,
+      description: `Smart Parking API ID - ${stageName}`,
+      exportName: `SmartParking-API-ID-${stageName}`,
+    });
+
+    // Lambda Function ARNs for monitoring
+    new CfnOutput(this, "ViewAvailableSpotsArn", {
+      value: viewAvailableSpots.functionArn,
+      description: "View Available Spots Lambda ARN",
+    });
+
+    new CfnOutput(this, "MakeReservationArn", {
+      value: makeReservation.functionArn,
+      description: "Make Reservation Lambda ARN",
+    });
+
+    new CfnOutput(this, "InitiatePaymentArn", {
+      value: initiatePayment.functionArn,
+      description: "Initiate Payment Lambda ARN",
+    });
+
+    new CfnOutput(this, "WebhookListenerArn", {
+      value: webhookListener.functionArn,
+      description: "Webhook Listener Lambda ARN",
     });
   }
 }
 
 module.exports = { ApiStack };
-
-
-// TODO:
-// INTEGRATING AWS SQS FOR MAKE PAYMENT COMMAND
