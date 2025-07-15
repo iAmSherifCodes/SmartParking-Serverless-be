@@ -1,22 +1,53 @@
 {
-  "name": "parking_serverless",
-  "version": "0.1.0",
-  "bin": {
-    "parking_serverless": "bin/parking_serverless.js"
+  "name": "smart-parking-serverless",
+  "version": "1.0.0",
+  "description": "Smart Parking Serverless Application with AWS CDK",
+  "author": "Smart Park Team",
+  "license": "MIT",
+  "keywords": ["parking", "serverless", "aws", "cdk", "lambda", "dynamodb"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/smart-parking-serverless.git"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
   "scripts": {
-    "build": "echo \"The build step is not required when using JavaScript!\" && exit 0",
+    "build": "echo \"Build step not required for JavaScript CDK\" && exit 0",
     "cdk": "cdk",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .js --fix",
+    "format": "prettier --write .",
+    "deploy:dev": "./scripts/deploy.sh dev",
+    "deploy:staging": "./scripts/deploy.sh staging",
+    "deploy:prod": "./scripts/deploy.sh prod",
+    "destroy:dev": "./scripts/destroy.sh dev",
+    "destroy:staging": "./scripts/destroy.sh staging",
+    "destroy:prod": "./scripts/destroy.sh prod",
+    "setup-secrets:dev": "./scripts/setup-secrets.sh dev",
+    "setup-secrets:staging": "./scripts/setup-secrets.sh staging",
+    "setup-secrets:prod": "./scripts/setup-secrets.sh prod",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "bootstrap": "cdk bootstrap",
+    "validate": "npm run lint && npm run test",
+    "prepare": "husky install || true"
   },
   "devDependencies": {
     "aws-cdk": "2.163.1",
     "jest": "^29.7.0",
-    "uuid": "^11.0.3"
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.2"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.679.0",
     "@aws-sdk/lib-dynamodb": "^3.679.0",
+    "@aws-sdk/client-ssm": "^3.679.0",
     "aws-cdk-lib": "2.163.1",
     "axios": "^1.7.7",
     "constructs": "^10.0.0",
@@ -24,5 +55,14 @@
     "joi": "^17.13.3",
     "moment-timezone": "^0.5.46",
     "uuid": "^11.0.3"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
